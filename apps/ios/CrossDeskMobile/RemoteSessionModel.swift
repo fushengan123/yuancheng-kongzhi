@@ -365,6 +365,14 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
     @Published private(set) var remotePlatform: RemoteHostPlatform = .unknown
 
     let bridge = CrossDeskRTCBridge()
+    // feature/parity: active key mapping profile resolved into wire actions.
+    var keyMapProfile: KeyMapProfile? {
+        didSet { keyMapEngine = RemoteKeyMapEngine(profile: keyMapProfile) }
+    }
+    private var keyMapEngine: RemoteKeyMapEngine?
+    private var mappedPointer = CGPoint(x: 0.5, y: 0.5)
+    private var axisFired: Set<UInt32> = []
+    private var previousGamepadButtons: Set<UInt32> = []
     private let networkPath = NWPathMonitor()
     let pictureInPicture = RemotePictureInPicture()
     let announcements = AnnouncementInbox()
@@ -1299,7 +1307,104 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     func sendKeyChord(_ keyCode: UInt, modifiers: [UInt]) {
         guard hasNetworkConsent, isConnected, !privacyScreen.unlockNotice else { return }
+        if modifiers.isEmpty, let engine = keyMapEngine,
+           let action = engine.resolveKey(UInt32(keyCode)) {
+            performMappedAction(action)
+            return
+        }
         bridge.sendKeyChord(keyCode, modifiers: RemoteShortcut.modifierKeys.filter(modifiers.contains).map { NSNumber(value: $0) })
+    }
+
+    // feature/parity: applies the active game/key mapping profile to hardware
+    // keyboard state so mapped keys fire once per press instead of repeating.
+    func sendKeyState(_ keyCode: UInt, isDown: Bool) {
+        guard hasNetworkConsent, isConnected else { return }
+        if let engine = keyMapEngine,
+           let action = engine.resolveKey(UInt32(keyCode)) {
+            if isDown { performMappedAction(action) }
+            return
+        }
+        bridge.sendWindowsKeyCode(keyCode, isDown: isDown)
+    }
+
+    // feature/parity: gamepad state from a GCController. Mapped buttons and
+    // axes run locally; unmapped state is forwarded to the host.
+    func sendGamepad(buttons: Set<UInt32>, axes: [UInt32: Int]) {
+        guard hasNetworkConsent, isConnected else { return }
+        var rawButtons: [NSNumber] = []
+        for index in buttons.sorted() {
+            if let engine = keyMapEngine,
+               let action = engine.resolveButton(index) {
+                performMappedAction(action)
+            } else {
+                rawButtons.append(NSNumber(value: index))
+            }
+        }
+        let rawSet = Set(rawButtons.map { $0.uint32Value })
+        let released = previousGamepadButtons.subtracting(rawSet)
+        previousGamepadButtons = rawSet
+
+        var rawAxes: [NSNumber] = []
+        for index in UInt32(0)..<6 {
+            let value = axes[index] ?? 0
+            if let engine = keyMapEngine,
+               let action = engine.resolveAxis(index, value: value) {
+                if !axisFired.contains(index) {
+                    performMappedAction(action)
+                    axisFired.insert(index)
+                }
+            } else {
+                axisFired.remove(index)
+            }
+            rawAxes.append(NSNumber(value: value))
+        }
+        bridge.sendGamepadPlayer(0,
+                                 buttons: rawButtons,
+                                 released: released.sorted().map { NSNumber(value: $0) },
+                                 axes: rawAxes)
+    }
+
+    private func performMappedAction(_ action: RemoteKeyMapAction) {
+        switch action {
+        case .key(let code):
+            bridge.sendWindowsKeyCode(UInt(code), isDown: true)
+            bridge.sendWindowsKeyCode(UInt(code), isDown: false)
+        case .chord(let codes):
+            for code in codes { bridge.sendWindowsKeyCode(UInt(code), isDown: true) }
+            for code in codes.reversed() { bridge.sendWindowsKeyCode(UInt(code), isDown: false) }
+        case .mouseClick(let button):
+            let point = CGPoint(x: min(max(mappedPointer.x, 0), 1),
+                                y: min(max(mappedPointer.y, 0), 1))
+            let down: CrossDeskPointerAction
+            let up: CrossDeskPointerAction
+            switch button {
+            case 1: down = .rightDown; up = .rightUp
+            case 2: down = .middleDown; up = .middleUp
+            default: down = .leftDown; up = .leftUp
+            }
+            bridge.sendPointer(x: Float(point.x), y: Float(point.y), action: down)
+            bridge.sendPointer(x: Float(point.x), y: Float(point.y), action: up)
+        case .mouseMove(let dx, let dy):
+            let size = displayGeometrySize
+            if size.width > 0, size.height > 0 {
+                mappedPointer.x = min(max(mappedPointer.x + dx / Double(size.width), 0), 1)
+                mappedPointer.y = min(max(mappedPointer.y + dy / Double(size.height), 0), 1)
+            }
+            bridge.sendPointer(x: Float(mappedPointer.x), y: Float(mappedPointer.y),
+                               action: .move)
+        case .wheel(let dx, let dy):
+            bridge.sendScrollX(Float(mappedPointer.x), y: Float(mappedPointer.y),
+                               deltaX: Int(dx), deltaY: Int(dy))
+        case .macro(let codes, let delayMs):
+            let step = max(1, Int(delayMs))
+            for (index, code) in codes.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(step * index)) { [weak self] in
+                    guard let self, self.isConnected else { return }
+                    self.bridge.sendWindowsKeyCode(UInt(code), isDown: true)
+                    self.bridge.sendWindowsKeyCode(UInt(code), isDown: false)
+                }
+            }
+        }
     }
 
     func showKeyboardCompositionHint() {
@@ -1318,11 +1423,6 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         } else {
             sendKeyChord(item.key, modifiers: item.modifiers)
         }
-    }
-
-    func sendKeyState(_ keyCode: UInt, isDown: Bool) {
-        guard hasNetworkConsent, isConnected else { return }
-        bridge.sendWindowsKeyCode(keyCode, isDown: isDown)
     }
 
     func rtcBridge(_ bridge: CrossDeskRTCBridge, didChangeIdentityStorageError hasError: Bool) {

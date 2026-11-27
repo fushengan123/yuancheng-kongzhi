@@ -311,6 +311,13 @@ final class NativeSession implements AutoCloseable {
     void surface(Surface value) { execute(() -> { surface = value; if (handle != 0) nSurface(handle, value); }); }
     void pointer(float x, float y, int flag, int wheel) { execute(() -> { if (connected) nPointer(handle, x, y, flag, wheel); }); }
     void key(int code, boolean down) { execute(() -> { if (connected) nKey(handle, code, down); }); }
+    // feature/parity: physical gamepad state forwarded to the host.
+    void gamepadButton(int index, boolean down) { execute(() -> { if (connected) nGamepadButton(handle, index, down); }); }
+    void gamepadAxes(int[] values) {
+        if (values == null || values.length == 0 || values.length > 8) return;
+        final int[] copy = values.clone();
+        execute(() -> { if (connected) nGamepadAxes(handle, copy); });
+    }
     void chord(int code,int[] modifiers) {
         if(closed||!connected)return;
         int[] keys=RemoteShortcuts.normalize(modifiers);
@@ -404,6 +411,8 @@ final class NativeSession implements AutoCloseable {
     private static native void nReady(long handle,byte[] displayResolutions);
     private static native void nPointer(long handle, float x, float y, int flag, int wheel);
     private static native void nKey(long handle, int code, boolean down);
+    private static native void nGamepadButton(long handle, int index, boolean down);
+    private static native void nGamepadAxes(long handle, int[] values);
     private static native void nText(long handle,byte[] text);
     private static native void nControl(long handle, int type, int value);
     private static native boolean nDisplayResolution(long handle,int displayId,String displayKey,int width,int height,long requestId);

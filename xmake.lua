@@ -86,6 +86,16 @@ target("crossdesk_terminal_host")
     add_includedirs(path.join(source_dir, "libs/terminal_host/include"), {public = true})
 target_end()
 
+target("crossdesk_portmap")
+    set_kind("static")
+    add_files(path.join(source_dir, "libs/portmap/src/*.cpp"))
+    add_headerfiles(path.join(source_dir, "libs/portmap/include/(*.h)"))
+    add_includedirs(path.join(source_dir, "libs/portmap/include"), {public = true})
+    if is_plat("windows") then
+        add_syslinks("ws2_32")
+    end
+target_end()
+
 -- iOS packages this controller helper alongside the wire and MiniRTC archives.
 -- Keep crypto headers out of the Objective-C++ bridge's public include paths.
 if is_plat("iphoneos") then
@@ -148,6 +158,13 @@ if os.isdir(path.join(wire_dir, "tests")) then
         set_default(false)
         add_deps("crossdesk_terminal_host")
         add_files(path.join(source_dir, "libs/terminal_host/tests/terminal_host_test.cpp"))
+    target_end()
+
+    target("port_mapper_test")
+        set_kind("binary")
+        set_default(false)
+        add_deps("crossdesk_portmap")
+        add_files(path.join(source_dir, "libs/portmap/tests/port_mapper_test.cpp"))
     target_end()
 end
 

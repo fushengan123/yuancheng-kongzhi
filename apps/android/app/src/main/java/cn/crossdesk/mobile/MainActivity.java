@@ -1007,6 +1007,11 @@ public final class MainActivity extends Activity implements NativeSession.Listen
     @Override public void statistics(RemoteNetworkStatistics.Snapshot value){if(controls!=null)controls.statistics(value);if(value.fps>0)capturePreviewIfNeeded();}
     @Override public boolean dispatchKeyEvent(KeyEvent event){
         if (privacyUnlockDialog != null) return super.dispatchKeyEvent(event);
+        int padIndex=gamepadButtonIndex(event.getKeyCode());
+        if(padIndex>=0&&ready&&session!=null&&hasWindowFocus()){
+            session.gamepadButton(padIndex,event.getAction()==KeyEvent.ACTION_DOWN);
+            return true;
+        }
         int code=KeyMap.windowsCode(event.getKeyCode());View focus=getCurrentFocus();
         boolean remoteEditor=focus instanceof RemoteKeyboardInput;
         boolean desktopKey=event.isCtrlPressed()||event.isAltPressed()||event.isMetaPressed()||pressed.contains(code)
@@ -1025,6 +1030,40 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         return super.dispatchKeyEvent(event);
     }
     private void releaseKeys(){if(session!=null)for(int code:pressed)session.key(code,false);pressed.clear();}
+    // feature/parity: Android gamepad buttons use the shared key map index
+    // convention (A=0..DRight=15). Only hardware gamepads reach this path.
+    private static int gamepadButtonIndex(int keyCode){
+        switch(keyCode){
+            case KeyEvent.KEYCODE_BUTTON_A: return 0;
+            case KeyEvent.KEYCODE_BUTTON_B: return 1;
+            case KeyEvent.KEYCODE_BUTTON_X: return 2;
+            case KeyEvent.KEYCODE_BUTTON_Y: return 3;
+            case KeyEvent.KEYCODE_BUTTON_L1: return 4;
+            case KeyEvent.KEYCODE_BUTTON_R1: return 5;
+            case KeyEvent.KEYCODE_BUTTON_L2: return 6;
+            case KeyEvent.KEYCODE_BUTTON_R2: return 7;
+            case KeyEvent.KEYCODE_BUTTON_START: return 8;
+            case KeyEvent.KEYCODE_BUTTON_SELECT: return 9;
+            case KeyEvent.KEYCODE_BUTTON_THUMBL: return 10;
+            case KeyEvent.KEYCODE_BUTTON_THUMBR: return 11;
+            default: return -1;
+        }
+    }
+    @Override public boolean dispatchGenericMotionEvent(MotionEvent event){
+        if(ready&&session!=null&&hasWindowFocus()
+                &&(event.getSource()&android.view.InputDevice.SOURCE_JOYSTICK)==android.view.InputDevice.SOURCE_JOYSTICK){
+            int[] axes=new int[6];
+            axes[0]=(int)(event.getAxisValue(MotionEvent.AXIS_X)*32767);
+            axes[1]=(int)(event.getAxisValue(MotionEvent.AXIS_Y)*32767);
+            axes[2]=(int)(event.getAxisValue(MotionEvent.AXIS_Z)*32767);
+            axes[3]=(int)(event.getAxisValue(MotionEvent.AXIS_RZ)*32767);
+            axes[4]=(int)(event.getAxisValue(MotionEvent.AXIS_LTRIGGER)*32767);
+            axes[5]=(int)(event.getAxisValue(MotionEvent.AXIS_RTRIGGER)*32767);
+            session.gamepadAxes(axes);
+            return true;
+        }
+        return super.dispatchGenericMotionEvent(event);
+    }
     private void navigateBack(){if(backAction==null)return;navigatingBack=true;try{backAction.run();}finally{navigatingBack=false;}}
     private void back(){if(controls!=null&&controls.closeKeyboard())return;pageHost.finish();if(session!=null){if(ready)confirmDisconnect();else end("");}else if(backAction!=null)navigateBack();else finish();}
     @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);if(!focus)releaseKeys();else applySystemBars();}

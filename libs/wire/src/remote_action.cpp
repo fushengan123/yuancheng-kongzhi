@@ -286,6 +286,16 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
     case ControlType::terminal_close:
       object["terminal_close"] = {{"session_id", action.tr.session_id}};
       break;
+    case ControlType::port_mapping_open:
+      object["port_mapping_open"] = {
+          {"session_id", action.pmo.session_id},
+          {"listen_port", action.pmo.listen_port},
+          {"target_port", action.pmo.target_port},
+          {"target_host", action.pmo.target_host}};
+      break;
+    case ControlType::port_mapping_close:
+      object["port_mapping_close"] = {{"session_id", action.pmc.session_id}};
+      break;
     case ControlType::cursor_state:
       object["cursor_state"] =
           {{"seq", action.cs.seq},
@@ -326,7 +336,9 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
                                   {"frame_rate", action.vs.frame_rate},
                                   {"preference", action.vs.preference},
                                   {"request_id", action.vs.request_id},
-                                  {"accepted", action.vs.accepted}};
+                                  {"accepted", action.vs.accepted},
+                                  {"hdr", action.vs.hdr},
+                                  {"chroma", action.vs.chroma}};
       break;
     case ControlType::audio_capture:
       object["audio_capture"] = action.a;
@@ -483,6 +495,26 @@ bool RemoteAction::FromJson(const std::string& json_string,
         output.tr.session_id =
             object.at("terminal_close").at("session_id").get<uint32_t>();
         break;
+      case ControlType::port_mapping_open: {
+        const auto& value = object.at("port_mapping_open");
+        output.pmo.session_id = value.at("session_id").get<uint32_t>();
+        output.pmo.listen_port =
+            value.value("listen_port", 0u);
+        output.pmo.target_port =
+            value.value("target_port", 0u);
+        const std::string host =
+            value.value("target_host", std::string("127.0.0.1"));
+        std::memcpy(output.pmo.target_host, host.c_str(),
+                    std::min(host.size(), sizeof(output.pmo.target_host) - 1));
+        output.pmo.target_host[std::min(host.size(),
+                                        sizeof(output.pmo.target_host) - 1)] =
+            '\0';
+        break;
+      }
+      case ControlType::port_mapping_close:
+        output.pmc.session_id =
+            object.at("port_mapping_close").at("session_id").get<uint32_t>();
+        break;
       case ControlType::mouse:
         output.pointer_sequence = object.at("mouse").value("seq", uint64_t{0});
         output.m.x = object.at("mouse").at("x").get<float>();
@@ -588,11 +620,13 @@ bool RemoteAction::FromJson(const std::string& json_string,
         for (const auto* field : {"quality", "frame_rate", "preference"}) {
           if (!settings.at(field).is_number_integer()) return false;
           const auto value = settings.at(field).get<int64_t>();
-          if (value < 0 || value > 60) return false;
+          if (value < 0 || value > 144) return false;
         }
         output.vs = {settings.at("quality").get<int>(),
                      settings.at("frame_rate").get<int>(),
                      settings.at("preference").get<int>()};
+        output.vs.hdr = settings.value("hdr", false);
+        output.vs.chroma = settings.value("chroma", 0);
         if (!ValidVideoSettings(output.vs)) return false;
         const auto& request_id = settings.at("request_id");
         if (!request_id.is_number_integer() || request_id.get<int64_t>() < 0 ||

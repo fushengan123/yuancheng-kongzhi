@@ -77,6 +77,7 @@ struct Session {
   }
   std::set<int> pressed_keys;
   unsigned pressed_buttons = 0;
+  uint32_t gamepad_seq = 0;
   float pointer_x = .5f, pointer_y = .5f;
   android_controller::LatestFrameWorker<VideoPicture> renderer{
       [this](VideoPicture picture) { RenderVideo(this, std::move(picture)); }};
@@ -447,6 +448,37 @@ extern "C" JNIEXPORT void JNICALL JNI_METHOD(nKey)(JNIEnv*, jclass, jlong handle
   RemoteAction action{}; action.type = keyboard;
   action.k = {static_cast<size_t>(key), 0, false, down ? key_down : key_up};
   if (down) s->pressed_keys.insert(key); else s->pressed_keys.erase(key);
+  s->Send(kKeyboardStream, action.to_json());
+}
+extern "C" JNIEXPORT void JNICALL JNI_METHOD(nGamepadButton)(
+    JNIEnv*, jclass, jlong handle, jint index, jboolean down) {
+  auto* s = From(handle); if (!s) return;
+  if (index < 0 || static_cast<size_t>(index) >= kMaxGamepadButtons) return;
+  RemoteAction action{}; action.type = gamepad_state;
+  action.gs.seq = ++s->gamepad_seq;
+  action.gs.player = 0;
+  action.gs.button_count = 1;
+  action.gs.buttons[0] = {static_cast<uint32_t>(index), down != JNI_FALSE};
+  action.gs.axis_count = 0;
+  s->Send(kKeyboardStream, action.to_json());
+}
+extern "C" JNIEXPORT void JNICALL JNI_METHOD(nGamepadAxes)(
+    JNIEnv* env, jclass, jlong handle, jintArray values) {
+  auto* s = From(handle); if (!s || !values) return;
+  const jsize count = env->GetArrayLength(values);
+  if (count <= 0 || static_cast<size_t>(count) > kMaxGamepadAxes) return;
+  jint buffer[kMaxGamepadAxes]{};
+  env->GetIntArrayRegion(values, 0, count, buffer);
+  if (env->ExceptionCheck()) return;
+  RemoteAction action{}; action.type = gamepad_state;
+  action.gs.seq = ++s->gamepad_seq;
+  action.gs.player = 0;
+  action.gs.button_count = 0;
+  action.gs.axis_count = static_cast<std::size_t>(count);
+  for (jsize i = 0; i < count; ++i) {
+    action.gs.axes[i] = {static_cast<uint32_t>(i),
+                         std::clamp(static_cast<int>(buffer[i]), -32768, 32767)};
+  }
   s->Send(kKeyboardStream, action.to_json());
 }
 extern "C" JNIEXPORT void JNICALL JNI_METHOD(nText)(JNIEnv* env, jclass, jlong handle, jbyteArray bytes) {

@@ -60,6 +60,7 @@ struct RemoteSessionView: View {
     @StateObject private var keyboardGeometry = RemoteKeyboardGeometry()
     @StateObject private var shortcutStore = RemoteShortcutStore()
     @StateObject private var keyMapStore = RemoteKeyMapStore()
+    @StateObject private var gamepadMonitor = RemoteGamepadMonitor()
     @State private var showingKeyMapEditor = false
     @State private var shortcutManagerVisible = false
     @State private var shortcutManagerPlatform = "unknown"
@@ -236,6 +237,11 @@ struct RemoteSessionView: View {
             }
         }
         .onAppear {
+            session.keyMapProfile = keyMapStore.activeProfile
+            gamepadMonitor.onState = { buttons, axes in
+                session.sendGamepad(buttons: buttons, axes: axes)
+            }
+            gamepadMonitor.start()
             mouseInput.send = { x, y, flag, wheel in
                 cursorPosition = CGPoint(x: CGFloat(x), y: CGFloat(y))
                 if flag == 1 || flag == 3 { systemKeyboardContext.remoteFocusWillChange() }
@@ -254,6 +260,7 @@ struct RemoteSessionView: View {
             }
         }
         .onDisappear {
+            gamepadMonitor.stop()
             mouseInput.releaseAll()
             mouseInput.send = nil
             keyboardInputVisible = false
@@ -315,11 +322,16 @@ struct RemoteSessionView: View {
         }) {
             RemoteShortcutManager(store: shortcutStore, platform: shortcutManagerPlatform)
         }
-        .sheet(isPresented: $showingKeyMapEditor) {
+        .sheet(isPresented: $showingKeyMapEditor, onDismiss: {
+            session.keyMapProfile = keyMapStore.activeProfile
+        }) {
             NavigationStack {
                 RemoteKeyMapEditor(profile: keyMapStore.activeProfile)
                     .environmentObject(keyMapStore)
             }
+        }
+        .onValueChange(of: keyMapStore.revision) { _ in
+            session.keyMapProfile = keyMapStore.activeProfile
         }
     }
 

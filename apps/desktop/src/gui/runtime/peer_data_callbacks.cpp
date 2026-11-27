@@ -4,6 +4,7 @@
 
 #include <app_version.h>
 #include <remote_action.h>
+#include <port_mapper.h>
 #include <stream_names.h>
 #include <terminal_host.h>
 #include <nlohmann/json.hpp>
@@ -625,6 +626,28 @@ InputOutcome GuiRuntime::ApplyRemoteInput(const std::string& remote_id,
   }
   if (remote_action.type == ControlType::terminal_close) {
     terminal::TerminalHost::Instance().Close(remote_action.tr.session_id);
+    return InputOutcome::applied;
+  }
+  // feature/parity: LAN port mapping channel.
+  if (remote_action.type == ControlType::port_mapping_open) {
+    crossdesk::portmap::MappingRule rule{};
+    rule.session_id = remote_action.pmo.session_id;
+    rule.listen_port = static_cast<uint16_t>(remote_action.pmo.listen_port);
+    rule.target_port = static_cast<uint16_t>(remote_action.pmo.target_port);
+    rule.target_host = remote_action.pmo.target_host;
+    if (rule.target_host.empty()) rule.target_host = "127.0.0.1";
+    const bool started =
+        crossdesk::portmap::PortMapper::Instance().Start(rule);
+    RemoteAction response{};
+    response.type = ControlType::port_mapping_open;
+    response.pmo = remote_action.pmo;
+    response.pmo.listen_port = started ? rule.listen_port : 0;
+    SendRemoteInput(response);
+    return started ? InputOutcome::applied : InputOutcome::failed;
+  }
+  if (remote_action.type == ControlType::port_mapping_close) {
+    crossdesk::portmap::PortMapper::Instance().Stop(
+        remote_action.pmc.session_id);
     return InputOutcome::applied;
   }
 #ifdef _WIN32

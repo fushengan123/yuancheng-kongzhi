@@ -43,6 +43,9 @@ enum ControlType {
   terminal_open = 19,
   terminal_data = 20,
   terminal_close = 21,
+  // feature/parity: LAN port mapping request channel.
+  port_mapping_open = 22,
+  port_mapping_close = 23,
 };
 
 enum MouseFlag {
@@ -125,6 +128,17 @@ struct TerminalOpen {
 };
 
 struct TerminalSessionRef {
+  uint32_t session_id;
+};
+
+struct PortMappingOpen {
+  uint32_t session_id;
+  uint32_t listen_port;
+  uint32_t target_port;
+  char target_host[128];
+};
+
+struct PortMappingClose {
   uint32_t session_id;
 };
 
@@ -231,10 +245,13 @@ struct PrivacyStatus {
 
 struct VideoSettings {
   int quality;     // 0: low, 1: medium, 2: high
-  int frame_rate;  // 30 or 60
+  int frame_rate;  // 30, 60, 120 or 144
   int preference;  // 0: frame rate, 1: quality, 2: balanced
   uint32_t request_id;
   bool accepted;  // Only meaningful in video_settings_status.
+  // feature/parity: high dynamic range and chroma subsampling negotiation.
+  bool hdr;   // request HDR when the host encoder supports it
+  int chroma; // 0: 4:2:0, 1: 4:2:2, 2: 4:4:4
 };
 
 struct VideoCodecStatus {
@@ -243,8 +260,10 @@ struct VideoCodecStatus {
 
 inline bool ValidVideoSettings(const VideoSettings& settings) {
   return settings.quality >= 0 && settings.quality <= 2 &&
-         (settings.frame_rate == 30 || settings.frame_rate == 60) &&
-         settings.preference >= 0 && settings.preference <= 2;
+         (settings.frame_rate == 30 || settings.frame_rate == 60 ||
+          settings.frame_rate == 120 || settings.frame_rate == 144) &&
+         settings.preference >= 0 && settings.preference <= 2 &&
+         settings.chroma >= 0 && settings.chroma <= 2;
 }
 
 inline constexpr std::size_t kMaxTextInputBytes = 16 * 1024;
@@ -269,6 +288,8 @@ struct RemoteAction {
     GamepadRumble gr;
     TerminalOpen to;
     TerminalSessionRef tr;
+    PortMappingOpen pmo;
+    PortMappingClose pmc;
   };
 
   // Optional order of pointer events across the motion and reliable streams.

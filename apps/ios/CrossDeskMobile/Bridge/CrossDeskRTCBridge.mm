@@ -291,17 +291,26 @@ std::string KeyJSON(NSUInteger key_code, bool is_down) {
 }
 
 std::string GamepadJSON(uint32_t player, NSArray<NSNumber *> *buttons,
+                        NSArray<NSNumber *> *released,
                         NSArray<NSNumber *> *axes) {
   static uint32_t sequence = 0;
   RemoteAction action{};
   action.type = ControlType::gamepad_state;
   action.gs.seq = ++sequence;
   action.gs.player = player;
-  action.gs.button_count =
+  const std::size_t pressed =
       std::min(static_cast<std::size_t>(buttons.count), crossdesk::kMaxGamepadButtons);
-  for (std::size_t i = 0; i < action.gs.button_count; ++i) {
-    action.gs.buttons[i] = {buttons[i].unsignedIntValue, true};
+  std::size_t index = 0;
+  for (std::size_t i = 0; i < pressed; ++i) {
+    action.gs.buttons[index++] = {buttons[i].unsignedIntValue, true};
   }
+  const std::size_t lifted =
+      std::min(static_cast<std::size_t>(released.count),
+               crossdesk::kMaxGamepadButtons - index);
+  for (std::size_t i = 0; i < lifted; ++i) {
+    action.gs.buttons[index++] = {released[i].unsignedIntValue, false};
+  }
+  action.gs.button_count = index;
   action.gs.axis_count =
       std::min(static_cast<std::size_t>(axes.count), crossdesk::kMaxGamepadAxes);
   for (std::size_t i = 0; i < action.gs.axis_count; ++i) {
@@ -1045,8 +1054,9 @@ MiniRtcParams MakeParams(const RTCState &state, const std::string &user_id,
 
 - (void)sendGamepadPlayer:(uint32_t)player
                   buttons:(NSArray<NSNumber *> *)buttons
+                 released:(NSArray<NSNumber *> *)released
                      axes:(NSArray<NSNumber *> *)axes {
-  [self sendMessage:GamepadJSON(player, buttons, axes)
+  [self sendMessage:GamepadJSON(player, buttons, released, axes)
            reliable:YES
              stream:kKeyboardStream];
 }
