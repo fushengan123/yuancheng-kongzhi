@@ -298,12 +298,12 @@ std::string GamepadJSON(uint32_t player, NSArray<NSNumber *> *buttons,
   action.gs.seq = ++sequence;
   action.gs.player = player;
   action.gs.button_count =
-      std::min(static_cast<std::size_t>(buttons.count), kMaxGamepadButtons);
+      std::min(static_cast<std::size_t>(buttons.count), crossdesk::kMaxGamepadButtons);
   for (std::size_t i = 0; i < action.gs.button_count; ++i) {
     action.gs.buttons[i] = {buttons[i].unsignedIntValue, true};
   }
   action.gs.axis_count =
-      std::min(static_cast<std::size_t>(axes.count), kMaxGamepadAxes);
+      std::min(static_cast<std::size_t>(axes.count), crossdesk::kMaxGamepadAxes);
   for (std::size_t i = 0; i < action.gs.axis_count; ++i) {
     action.gs.axes[i] = {static_cast<uint32_t>(i), axes[i].intValue};
   }
