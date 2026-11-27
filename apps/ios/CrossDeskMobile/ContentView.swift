@@ -415,8 +415,8 @@ private struct ConnectionHomeView: View {
     }
 
     private var announcementPlacement: ToolbarItemPlacement {
-        if #available(iOS 27.0, *) { return .topBarPinnedTrailing }
-        return .navigationBarTrailing
+        // Keep the test build compatible with the Xcode 26 SDK used by CI.
+        .navigationBarTrailing
     }
 
     private var signalStatusBadge: some View {
