@@ -67,5 +67,30 @@ int main() {
   ok &= ExpectEqual("parsed scan 1", parsed.ks.pressed_keys[1].scan_code, 29);
   ok &= ExpectTrue("parsed extended 1", parsed.ks.pressed_keys[1].extended);
 
+  ok &= ExpectEqual("gamepad_state type", crossdesk::ControlType::gamepad_state,
+                    17);
+  ok &= ExpectEqual("gamepad_rumble type", crossdesk::ControlType::gamepad_rumble,
+                    18);
+
+  crossdesk::RemoteAction gamepad{};
+  gamepad.type = crossdesk::ControlType::gamepad_state;
+  gamepad.gs.seq = 7;
+  gamepad.gs.player = 1;
+  gamepad.gs.button_count = 2;
+  gamepad.gs.buttons[0] = {0, true};
+  gamepad.gs.buttons[1] = {1, false};
+  gamepad.gs.axis_count = 1;
+  gamepad.gs.axes[0] = {1, -12345};
+  const std::string gamepad_json = gamepad.to_json();
+  crossdesk::RemoteAction parsed_gamepad{};
+  ok &= ExpectTrue("parse gamepad_state", parsed_gamepad.from_json(gamepad_json));
+  ok &= ExpectEqual("parsed gamepad button count",
+                    parsed_gamepad.gs.button_count, 2);
+  ok &= ExpectTrue("parsed gamepad button 0 down",
+                   parsed_gamepad.gs.buttons[0].down);
+  ok &= ExpectEqual("parsed gamepad axis value",
+                    static_cast<size_t>(parsed_gamepad.gs.axes[0].value + 32768),
+                    20423);
+
   return ok ? 0 : 1;
 }

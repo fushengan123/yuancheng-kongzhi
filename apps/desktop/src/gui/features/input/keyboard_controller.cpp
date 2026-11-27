@@ -277,21 +277,151 @@ bool KeyboardController::InjectRemoteKey(int key_code, bool is_down,
 InputOutcome KeyboardController::ApplyRemoteEvent(const std::string& remote_id,
                                           const RemoteAction& action) {
   std::lock_guard input_lock(remote_input_mutex_);
-  const int key_code = static_cast<int>(action.k.key_value);
+  const int original_key = static_cast<int>(action.k.key_value);
   const bool is_down = action.k.flag == KeyFlag::key_down;
-  const bool injected =
-      InjectRemoteKey(key_code, is_down, action.k.scan_code, action.k.extended);
-  if (injected) pending_key_releases_.Supersede(key_code);
+
+  // feature/parity: resolve an optional per-device key map before injection.
+  // An empty or invalid profile keeps the original behavior untouched.
+  keymap::KeyMapEngine* engine = nullptr;
+  const std::string profile_text = owner_.config_center_
+                                       ? owner_.config_center_->GetKeyMap(remote_id)
+                                       : std::string();
+  if (!profile_text.empty()) {
+    auto cached = remote_keymaps_.find(remote_id);
+    auto cached_text = remote_keymap_texts_.find(remote_id);
+    if (cached == remote_keymaps_.end() ||
+        cached_text == remote_keymap_texts_.end() ||
+        cached_text->second != profile_text) {
+      keymap::KeyMapEngine fresh;
+      if (fresh.Deserialize(profile_text)) {
+        auto inserted =
+            remote_keymaps_.insert_or_assign(remote_id, std::move(fresh));
+        remote_keymap_texts_[remote_id] = profile_text;
+        engine = &inserted.first->second;
+      } else {
+        remote_keymaps_.erase(remote_id);
+        remote_keymap_texts_.erase(remote_id);
+      }
+    } else {
+      engine = &cached->second;
+    }
+  }
+
+  std::vector<int> injected_keys;
+  bool resolved = false;
+  if (engine) {
+    keymap::Source source{};
+    source.type = keymap::SourceType::key;
+    source.code = action.k.key_value;
+    std::vector<keymap::Target> targets;
+    resolved = engine->Resolve(source, 0, targets);
+    if (resolved) {
+      for (const auto& target : targets) {
+        if (target.type != keymap::ActionType::key &&
+            target.type != keymap::ActionType::key_chord) {
+          continue;
+        }
+        for (std::size_t i = 0; i < target.keys.size(); ++i) {
+          const std::size_t index =
+              is_down ? i : target.keys.size() - 1 - i;
+          const int key = static_cast<int>(target.keys[index]);
+          if (InjectRemoteKey(key, is_down, 0, false)) {
+            injected_keys.push_back(key);
+          }
+        }
+      }
+    }
+  }
+  if (injected_keys.empty() && !resolved) {
+    if (InjectRemoteKey(original_key, is_down, action.k.scan_code,
+                        action.k.extended)) {
+      injected_keys.push_back(original_key);
+    }
+  }
 
   auto& state = remote_states_[remote_id];
   state.last_seen_tick = static_cast<uint32_t>(SDL_GetTicks());
-  if (is_down && injected) {
-    state.pressed_keys[key_code] =
-        KeyboardKey{key_code, action.k.scan_code, action.k.extended};
-  } else if (!is_down && injected) {
-    state.pressed_keys.erase(key_code);
+  for (int key : injected_keys) {
+    pending_key_releases_.Supersede(key);
+    if (is_down) {
+      state.pressed_keys[key] = KeyboardKey{key, 0, false};
+    } else {
+      state.pressed_keys.erase(key);
+    }
   }
-  return injected ? InputOutcome::applied : InputOutcome::failed;
+  return injected_keys.empty() ? InputOutcome::failed : InputOutcome::applied;
+}
+
+InputOutcome KeyboardController::ApplyRemoteGamepad(const std::string& remote_id,
+                                            const RemoteAction& action) {
+  std::lock_guard input_lock(remote_input_mutex_);
+  std::string profile_text = owner_.config_center_
+                                 ? owner_.config_center_->GetKeyMap(remote_id)
+                                 : std::string();
+  if (profile_text.empty()) return InputOutcome::ignored;
+
+  keymap::KeyMapEngine* engine = nullptr;
+  auto cached = remote_keymaps_.find(remote_id);
+  auto cached_text = remote_keymap_texts_.find(remote_id);
+  if (cached == remote_keymaps_.end() ||
+      cached_text == remote_keymap_texts_.end() ||
+      cached_text->second != profile_text) {
+    keymap::KeyMapEngine fresh;
+    if (fresh.Deserialize(profile_text)) {
+      auto inserted =
+          remote_keymaps_.insert_or_assign(remote_id, std::move(fresh));
+      remote_keymap_texts_[remote_id] = profile_text;
+      engine = &inserted.first->second;
+    } else {
+      remote_keymaps_.erase(remote_id);
+      remote_keymap_texts_.erase(remote_id);
+      return InputOutcome::ignored;
+    }
+  } else {
+    engine = &cached->second;
+  }
+
+  std::vector<int> injected_keys;
+  auto apply = [&](const keymap::Source& source, int value, bool down) {
+    std::vector<keymap::Target> targets;
+    if (!engine->Resolve(source, value, targets)) return;
+    for (const auto& target : targets) {
+      if (target.type != keymap::ActionType::key &&
+          target.type != keymap::ActionType::key_chord) {
+        continue;
+      }
+      for (std::size_t i = 0; i < target.keys.size(); ++i) {
+        const std::size_t index = down ? i : target.keys.size() - 1 - i;
+        const int key = static_cast<int>(target.keys[index]);
+        if (InjectRemoteKey(key, down, 0, false)) injected_keys.push_back(key);
+      }
+    }
+  };
+
+  const std::size_t button_count =
+      std::min(action.gs.button_count, crossdesk::kMaxGamepadButtons);
+  for (std::size_t i = 0; i < button_count; ++i) {
+    keymap::Source source{};
+    source.type = keymap::SourceType::gamepad_button;
+    source.code = action.gs.buttons[i].index;
+    apply(source, 0, action.gs.buttons[i].down);
+  }
+  const std::size_t axis_count =
+      std::min(action.gs.axis_count, crossdesk::kMaxGamepadAxes);
+  for (std::size_t i = 0; i < axis_count; ++i) {
+    keymap::Source source{};
+    source.type = keymap::SourceType::gamepad_axis;
+    source.code = action.gs.axes[i].index;
+    apply(source, action.gs.axes[i].value,
+          action.gs.axes[i].value > 1000 || action.gs.axes[i].value < -1000);
+  }
+
+  auto& state = remote_states_[remote_id];
+  state.last_seen_tick = static_cast<uint32_t>(SDL_GetTicks());
+  for (int key : injected_keys) {
+    pending_key_releases_.Supersede(key);
+  }
+  return injected_keys.empty() ? InputOutcome::ignored : InputOutcome::applied;
 }
 
 InputOutcome KeyboardController::ApplyRemoteText(const std::string& remote_id,

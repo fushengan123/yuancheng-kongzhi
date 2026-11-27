@@ -1013,8 +1013,14 @@ public final class MainActivity extends Activity implements NativeSession.Listen
             ||code==17||code==18||code==91||code==27||code==9||code>=33&&code<=40||code==45||code==46||code>=112&&code<=123;
         if(ready&&session!=null&&!pictureInPictureUi&&hasWindowFocus()&&(!(focus instanceof EditText)||remoteEditor&&(!((RemoteKeyboardInput)focus).isAcceptingInput()||desktopKey))&&event.getKeyCode()!=KeyEvent.KEYCODE_BACK&&code!=0){
             boolean down=event.getAction()==KeyEvent.ACTION_DOWN;
-            if(down){pressed.add(code);if(remoteEditor)controls.resetKeyboardContext();}else pressed.remove(code);
-            session.key(code,down);return true;
+            if(down&&remoteEditor)controls.resetKeyboardContext();
+            // feature/parity: apply the active local key map before sending.
+            int[] mapped=RemoteKeyMaps.resolve(this,code);
+            for(int key:mapped){
+                if(down)pressed.add(key);else pressed.remove(key);
+                session.key(key,down);
+            }
+            return true;
         }
         return super.dispatchKeyEvent(event);
     }

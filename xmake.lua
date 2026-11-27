@@ -60,6 +60,32 @@ target("crossdesk_wire")
     add_includedirs(path.join(wire_dir, "include"), {public = true})
 target_end()
 
+-- feature/parity: reusable game key mapping engine. Keep dependency-free so it
+-- can be linked into desktop, Android native and iOS native archives.
+target("crossdesk_keymap")
+    set_kind("static")
+    add_files(path.join(source_dir, "libs/keymap/src/*.cpp"))
+    add_headerfiles(path.join(source_dir, "libs/keymap/include/(*.h)"))
+    add_includedirs(path.join(source_dir, "libs/keymap/include"), {public = true})
+target_end()
+
+target("crossdesk_wol")
+    set_kind("static")
+    add_files(path.join(source_dir, "libs/wol/src/*.cpp"))
+    add_headerfiles(path.join(source_dir, "libs/wol/include/(*.h)"))
+    add_includedirs(path.join(source_dir, "libs/wol/include"), {public = true})
+    if is_plat("windows") then
+        add_syslinks("ws2_32")
+    end
+target_end()
+
+target("crossdesk_terminal_host")
+    set_kind("static")
+    add_files(path.join(source_dir, "libs/terminal_host/src/*.cpp"))
+    add_headerfiles(path.join(source_dir, "libs/terminal_host/include/(*.h)"))
+    add_includedirs(path.join(source_dir, "libs/terminal_host/include"), {public = true})
+target_end()
+
 -- iOS packages this controller helper alongside the wire and MiniRTC archives.
 -- Keep crypto headers out of the Objective-C++ bridge's public include paths.
 if is_plat("iphoneos") then
@@ -101,6 +127,27 @@ if os.isdir(path.join(wire_dir, "tests")) then
         add_deps("crossdesk_wire")
         add_files(path.join(wire_dir,
             "tests/keyboard_state_wire_test.cpp"))
+    target_end()
+
+    target("key_map_test")
+        set_kind("binary")
+        set_default(false)
+        add_deps("crossdesk_keymap")
+        add_files(path.join(source_dir, "libs/keymap/tests/key_map_test.cpp"))
+    target_end()
+
+    target("wake_on_lan_test")
+        set_kind("binary")
+        set_default(false)
+        add_deps("crossdesk_wol")
+        add_files(path.join(source_dir, "libs/wol/tests/wake_on_lan_test.cpp"))
+    target_end()
+
+    target("terminal_host_test")
+        set_kind("binary")
+        set_default(false)
+        add_deps("crossdesk_terminal_host")
+        add_files(path.join(source_dir, "libs/terminal_host/tests/terminal_host_test.cpp"))
     target_end()
 end
 

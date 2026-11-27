@@ -243,6 +243,49 @@ std::string RemoteAction::ToJson(const RemoteAction& action) {
           {{"seq", action.ks.seq}, {"pressed_keys", keys}};
       break;
     }
+    case ControlType::gamepad_state: {
+      json buttons = json::array();
+      const std::size_t button_count =
+          std::min(action.gs.button_count, kMaxGamepadButtons);
+      for (std::size_t i = 0; i < button_count; ++i) {
+        buttons.push_back({{"index", action.gs.buttons[i].index},
+                           {"down", action.gs.buttons[i].down}});
+      }
+      json axes = json::array();
+      const std::size_t axis_count =
+          std::min(action.gs.axis_count, kMaxGamepadAxes);
+      for (std::size_t i = 0; i < axis_count; ++i) {
+        axes.push_back({{"index", action.gs.axes[i].index},
+                        {"value", action.gs.axes[i].value}});
+      }
+      object["gamepad_state"] = {{"seq", action.gs.seq},
+                                 {"player", action.gs.player},
+                                 {"buttons", buttons},
+                                 {"axes", axes}};
+      break;
+    }
+    case ControlType::gamepad_rumble:
+      object["gamepad_rumble"] = {
+          {"player", action.gr.player},
+          {"low_frequency", action.gr.low_frequency},
+          {"high_frequency", action.gr.high_frequency},
+          {"duration_ms", action.gr.duration_ms}};
+      break;
+    case ControlType::terminal_open:
+      object["terminal_open"] = {{"session_id", action.to.session_id},
+                                 {"cols", action.to.cols},
+                                 {"rows", action.to.rows},
+                                 {"shell", action.to.shell}};
+      break;
+    case ControlType::terminal_data:
+      if (action.terminal_data.empty() ||
+          action.terminal_data.size() > kMaxTextInputBytes) return {};
+      object["terminal_data"] = {{"session_id", action.tr.session_id},
+                                 {"data", action.terminal_data}};
+      break;
+    case ControlType::terminal_close:
+      object["terminal_close"] = {{"session_id", action.tr.session_id}};
+      break;
     case ControlType::cursor_state:
       object["cursor_state"] =
           {{"seq", action.cs.seq},
@@ -382,6 +425,64 @@ bool RemoteAction::FromJson(const std::string& json_string,
         }
         break;
       }
+      case ControlType::gamepad_state: {
+        const auto& value = object.at("gamepad_state");
+        output.gs.seq = value.value("seq", 0u);
+        output.gs.player = value.value("player", 0u);
+        output.gs.button_count = 0;
+        const auto buttons = value.value("buttons", json::array());
+        if (buttons.is_array()) {
+          const std::size_t count =
+              std::min(buttons.size(), kMaxGamepadButtons);
+          for (std::size_t i = 0; i < count; ++i) {
+            output.gs.buttons[i].index = buttons[i].at("index").get<uint32_t>();
+            output.gs.buttons[i].down = buttons[i].at("down").get<bool>();
+          }
+          output.gs.button_count = count;
+        }
+        output.gs.axis_count = 0;
+        const auto axes = value.value("axes", json::array());
+        if (axes.is_array()) {
+          const std::size_t count = std::min(axes.size(), kMaxGamepadAxes);
+          for (std::size_t i = 0; i < count; ++i) {
+            output.gs.axes[i].index = axes[i].at("index").get<uint32_t>();
+            output.gs.axes[i].value = axes[i].at("value").get<int>();
+          }
+          output.gs.axis_count = count;
+        }
+        break;
+      }
+      case ControlType::gamepad_rumble: {
+        const auto& value = object.at("gamepad_rumble");
+        output.gr.player = value.value("player", 0u);
+        output.gr.low_frequency = value.value("low_frequency", 0.0f);
+        output.gr.high_frequency = value.value("high_frequency", 0.0f);
+        output.gr.duration_ms = value.value("duration_ms", 0u);
+        break;
+      }
+      case ControlType::terminal_open: {
+        const auto& value = object.at("terminal_open");
+        output.to.session_id = value.at("session_id").get<uint32_t>();
+        output.to.cols = value.value("cols", 80u);
+        output.to.rows = value.value("rows", 24u);
+        const std::string shell = value.value("shell", std::string("default"));
+        std::memcpy(output.to.shell, shell.c_str(),
+                    std::min(shell.size(), sizeof(output.to.shell) - 1));
+        output.to.shell[std::min(shell.size(), sizeof(output.to.shell) - 1)] = '\0';
+        break;
+      }
+      case ControlType::terminal_data: {
+        const auto& value = object.at("terminal_data");
+        output.tr.session_id = value.at("session_id").get<uint32_t>();
+        output.terminal_data = value.at("data").get<std::string>();
+        if (output.terminal_data.empty() ||
+            output.terminal_data.size() > kMaxTextInputBytes) return false;
+        break;
+      }
+      case ControlType::terminal_close:
+        output.tr.session_id =
+            object.at("terminal_close").at("session_id").get<uint32_t>();
+        break;
       case ControlType::mouse:
         output.pointer_sequence = object.at("mouse").value("seq", uint64_t{0});
         output.m.x = object.at("mouse").at("x").get<float>();

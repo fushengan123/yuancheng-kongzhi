@@ -5,6 +5,7 @@
 #include <app_version.h>
 #include <remote_action.h>
 #include <stream_names.h>
+#include <terminal_host.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -600,6 +601,32 @@ InputOutcome GuiRuntime::ApplyRemoteInput(const std::string& remote_id,
   if (remote_action.type == ControlType::text_input) {
     return keyboard_.ApplyRemoteText(remote_id, remote_action.text);
   }
+  // feature/parity: remote terminal channel.
+  if (remote_action.type == ControlType::terminal_open) {
+    const bool opened = terminal::TerminalHost::Instance().Open(
+        remote_action.to.session_id, remote_action.to.cols,
+        remote_action.to.rows, remote_action.to.shell);
+    return opened ? InputOutcome::applied : InputOutcome::failed;
+  }
+  if (remote_action.type == ControlType::terminal_data) {
+    auto& host = terminal::TerminalHost::Instance();
+    if (!host.Write(remote_action.tr.session_id, remote_action.terminal_data)) {
+      return InputOutcome::failed;
+    }
+    const std::string output = host.Read(remote_action.tr.session_id);
+    if (!output.empty()) {
+      RemoteAction response{};
+      response.type = ControlType::terminal_data;
+      response.tr.session_id = remote_action.tr.session_id;
+      response.terminal_data = output;
+      SendRemoteInput(response);
+    }
+    return InputOutcome::applied;
+  }
+  if (remote_action.type == ControlType::terminal_close) {
+    terminal::TerminalHost::Instance().Close(remote_action.tr.session_id);
+    return InputOutcome::applied;
+  }
 #ifdef _WIN32
   const bool keyboard_input = remote_action.type == ControlType::keyboard ||
                               remote_action.type == ControlType::keyboard_state;
@@ -654,6 +681,8 @@ InputOutcome GuiRuntime::ApplyRemoteInput(const std::string& remote_id,
     return keyboard_.ApplyRemoteEvent(remote_id, remote_action);
   } else if (remote_action.type == ControlType::keyboard_state) {
     return keyboard_.ApplyRemoteState(remote_id, remote_action);
+  } else if (remote_action.type == ControlType::gamepad_state) {
+    return keyboard_.ApplyRemoteGamepad(remote_id, remote_action);
   } else if (remote_action.type == ControlType::display_id) {
     const int ret = devices_.SwitchDisplay(remote_action.d);
     if (ret == 0) {

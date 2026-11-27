@@ -247,6 +247,16 @@ int ConfigCenter::Load() {
         device_wheel_sensitivity_.emplace(device, value.get<int>());
     }
   }
+  const auto keymaps = nlohmann::json::parse(
+      ini_->GetValue(section_, "device_keymaps", "{}"), nullptr, false);
+  device_keymaps_.clear();
+  if (keymaps.is_object()) {
+    for (const auto& [device, value] : keymaps.items()) {
+      if (!device.empty() && value.is_string()) {
+        device_keymaps_.emplace(device, value.get<std::string>());
+      }
+    }
+  }
   auto sizes = nlohmann::json::parse(
       ini_->GetValue(section_, "device_stream_window_sizes", "{}"), nullptr, false);
   ini_->stream_window_sizes = sizes.is_object() ? std::move(sizes) : nlohmann::json::object();
@@ -364,6 +374,7 @@ int ConfigCenter::Save() {
   ini_->SetBoolValue(section_, "pause_video_when_minimized",
                     pause_video_when_minimized_.load());
   ini_->SetLongValue(section_, "mouse_sensitivity_percent", GetMouseSensitivityPercent());
+  ini_->SetValue(section_, "device_keymaps", nlohmann::json(device_keymaps_).dump().c_str());
   ini_->SetBoolValue(section_, "portable_service_prompt_suppressed",
                     portable_service_prompt_suppressed_);
   ini_->SetValue(section_, "last_presented_release",
@@ -756,6 +767,27 @@ int ConfigCenter::GetWheelSensitivityPercent(const std::string& device) const {
   const auto found = device_wheel_sensitivity_.find(device);
   return found == device_wheel_sensitivity_.end() ? legacy_wheel_sensitivity_percent_
                                                  : found->second;
+}
+
+std::string ConfigCenter::GetKeyMap(const std::string& device) const {
+  const auto found = device_keymaps_.find(device);
+  return found == device_keymaps_.end() ? std::string() : found->second;
+}
+
+int ConfigCenter::SetKeyMap(const std::string& device,
+                            const std::string& profile) {
+  if (device.empty()) return -1;
+  auto updated = device_keymaps_;
+  if (profile.empty()) {
+    updated.erase(device);
+  } else {
+    updated[device] = profile;
+  }
+  if (StoreValues({{"device_keymaps", nlohmann::json(updated).dump()}}) != 0) {
+    return -1;
+  }
+  device_keymaps_ = std::move(updated);
+  return 0;
 }
 
 int ConfigCenter::SetInputSensitivity(const std::string& device,

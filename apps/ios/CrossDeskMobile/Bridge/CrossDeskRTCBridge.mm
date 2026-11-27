@@ -290,6 +290,26 @@ std::string KeyJSON(NSUInteger key_code, bool is_down) {
   return action.to_json();
 }
 
+std::string GamepadJSON(uint32_t player, NSArray<NSNumber *> *buttons,
+                        NSArray<NSNumber *> *axes) {
+  static uint32_t sequence = 0;
+  RemoteAction action{};
+  action.type = ControlType::gamepad_state;
+  action.gs.seq = ++sequence;
+  action.gs.player = player;
+  action.gs.button_count =
+      std::min(static_cast<std::size_t>(buttons.count), kMaxGamepadButtons);
+  for (std::size_t i = 0; i < action.gs.button_count; ++i) {
+    action.gs.buttons[i] = {buttons[i].unsignedIntValue, true};
+  }
+  action.gs.axis_count =
+      std::min(static_cast<std::size_t>(axes.count), kMaxGamepadAxes);
+  for (std::size_t i = 0; i < action.gs.axis_count; ++i) {
+    action.gs.axes[i] = {static_cast<uint32_t>(i), axes[i].intValue};
+  }
+  return action.to_json();
+}
+
 struct KeyMapping {
   NSUInteger key_code = 0;
   bool shift = false;
@@ -1021,6 +1041,14 @@ MiniRtcParams MakeParams(const RTCState &state, const std::string &user_id,
                                   message.data(), message.size(), kKeyboardStream);
     }
   });
+}
+
+- (void)sendGamepadPlayer:(uint32_t)player
+                  buttons:(NSArray<NSNumber *> *)buttons
+                     axes:(NSArray<NSNumber *> *)axes {
+  [self sendMessage:GamepadJSON(player, buttons, axes)
+           reliable:YES
+             stream:kKeyboardStream];
 }
 
 - (void)sendText:(NSString *)text {

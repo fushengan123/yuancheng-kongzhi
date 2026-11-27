@@ -59,6 +59,8 @@ struct RemoteSessionView: View {
     @StateObject private var systemKeyboardContext = RemoteKeyboardInputContext()
     @StateObject private var keyboardGeometry = RemoteKeyboardGeometry()
     @StateObject private var shortcutStore = RemoteShortcutStore()
+    @StateObject private var keyMapStore = RemoteKeyMapStore()
+    @State private var showingKeyMapEditor = false
     @State private var shortcutManagerVisible = false
     @State private var shortcutManagerPlatform = "unknown"
     @State private var previousKeyboardMode: RemoteKeyboardMode = .computer
@@ -312,6 +314,12 @@ struct RemoteSessionView: View {
             }
         }) {
             RemoteShortcutManager(store: shortcutStore, platform: shortcutManagerPlatform)
+        }
+        .sheet(isPresented: $showingKeyMapEditor) {
+            NavigationStack {
+                RemoteKeyMapEditor(profile: keyMapStore.activeProfile)
+                    .environmentObject(keyMapStore)
+            }
         }
     }
 
@@ -1283,6 +1291,10 @@ private struct FloatingSessionMenu: View {
                 LazyVGrid(columns: columns, spacing: 7) {
                     FloatingControlButton(title: NSLocalizedString("键盘", comment: ""), symbol: "keyboard",
                                           action: showKeyboard)
+                    FloatingControlButton(title: NSLocalizedString("按键映射", comment: ""), symbol: "gamecontroller") {
+                        statusMenuVisible = false
+                        showingKeyMapEditor = true
+                    }
                     FloatingControlButton(title: virtualMouseVisible ? NSLocalizedString("收起鼠标", comment: "") : NSLocalizedString("虚拟鼠标", comment: ""),
                                           symbol: "computermouse", action: toggleMouse)
                     FloatingControlButton(

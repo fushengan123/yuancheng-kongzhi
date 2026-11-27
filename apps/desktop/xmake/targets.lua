@@ -720,7 +720,7 @@ function setup_targets()
             "single_instance",
             "path_manager", "screen_capturer", "speaker_capturer",
             "device_controller", "thumbnail", "version_checker", "tools",
-            "crossdesk_wire", "crossdesk_file_browser", "privacy", "crossdesk_ui")
+            "crossdesk_wire", "crossdesk_keymap", "crossdesk_wol", "crossdesk_terminal_host", "crossdesk_file_browser", "privacy", "crossdesk_ui")
         add_files("apps/desktop/src/gui/render.cpp", "apps/desktop/src/gui/application/gui_application.cpp",
             "apps/desktop/src/gui/rendering/*.cpp",
             "apps/desktop/src/gui/runtime/*.cpp",

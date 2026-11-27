@@ -36,6 +36,13 @@ enum ControlType {
   video_codec_status = 14,
   display_resolution = 15,
   display_resolution_status = 16,
+  // feature/parity: game controller input and force feedback.
+  gamepad_state = 17,
+  gamepad_rumble = 18,
+  // feature/parity: remote terminal channel.
+  terminal_open = 19,
+  terminal_data = 20,
+  terminal_close = 21,
 };
 
 enum MouseFlag {
@@ -79,6 +86,46 @@ struct KeyboardState {
   uint32_t seq;
   std::size_t pressed_count;
   KeyboardStateKey pressed_keys[kMaxKeyboardStateKeys];
+};
+
+inline constexpr std::size_t kMaxGamepadButtons = 16;
+inline constexpr std::size_t kMaxGamepadAxes = 8;
+
+struct GamepadButton {
+  uint32_t index;
+  bool down;
+};
+
+struct GamepadAxis {
+  uint32_t index;
+  int value;  // -32768..32767
+};
+
+struct GamepadState {
+  uint32_t seq;
+  uint32_t player;
+  std::size_t button_count;
+  GamepadButton buttons[kMaxGamepadButtons];
+  std::size_t axis_count;
+  GamepadAxis axes[kMaxGamepadAxes];
+};
+
+struct GamepadRumble {
+  uint32_t player;
+  float low_frequency;
+  float high_frequency;
+  uint32_t duration_ms;
+};
+
+struct TerminalOpen {
+  uint32_t session_id;
+  uint32_t cols;
+  uint32_t rows;
+  char shell[32];
+};
+
+struct TerminalSessionRef {
+  uint32_t session_id;
 };
 
 // Optional presentation metadata. Zero preserves pre-metadata peers' behavior.
@@ -218,6 +265,10 @@ struct RemoteAction {
     PrivacyStatus ps;
     VideoSettings vs;
     VideoCodecStatus vcs;
+    GamepadState gs;
+    GamepadRumble gr;
+    TerminalOpen to;
+    TerminalSessionRef tr;
   };
 
   // Optional order of pointer events across the motion and reliable streams.
@@ -225,6 +276,8 @@ struct RemoteAction {
 
   // Committed UTF-8 text. Kept outside the POD union for automatic ownership.
   std::string text;
+  // Remote terminal output/input payload, also outside the POD union.
+  std::string terminal_data;
   // Optional host information extension, also returned with resolution status.
   std::vector<DisplayResolutionInfo> display_resolutions;
   DisplayResolutionChange resolution_change;

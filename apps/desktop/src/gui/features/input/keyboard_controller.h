@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include <remote_action.h>
+#include <key_map.h>
 
 #include "keyboard_state.h"
 #include "input_outcome.h"
@@ -34,6 +35,9 @@ public:
   InputOutcome ApplyRemoteEvent(const std::string &remote_id,
                         const RemoteAction &remote_action);
   InputOutcome ApplyRemoteText(const std::string& remote_id, const std::string& text);
+  // feature/parity: map gamepad buttons/axes through the active key map.
+  InputOutcome ApplyRemoteGamepad(const std::string& remote_id,
+                                  const RemoteAction& action);
   InputOutcome ApplyRemoteState(const std::string &remote_id,
                         const RemoteAction &remote_action);
   bool ReleaseRemotePressedKeys(const std::string &remote_id,
@@ -64,6 +68,9 @@ private:
   uint32_t state_sequence_ = 0;
   uint32_t last_heartbeat_tick_ = 0;
   std::unordered_map<std::string, RemoteState> remote_states_;
+  // feature/parity: per-device key mapping engines and their source text.
+  std::unordered_map<std::string, keymap::KeyMapEngine> remote_keymaps_;
+  std::unordered_map<std::string, std::string> remote_keymap_texts_;
   // Guards all remote key state and serializes injection, cleanup and retries.
   std::mutex remote_input_mutex_;
   // Successful new input supersedes cleanup of an older press of that key.

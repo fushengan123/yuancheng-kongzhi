@@ -203,6 +203,9 @@ typedef struct {
               deltaY:(NSInteger)deltaY;
 - (void)sendWindowsKeyCode:(NSUInteger)keyCode isDown:(BOOL)isDown;
 - (void)sendKeyChord:(NSUInteger)keyCode modifiers:(NSArray<NSNumber *> *)modifiers;
+- (void)sendGamepadPlayer:(uint32_t)player
+                  buttons:(NSArray<NSNumber *> *)buttons
+                     axes:(NSArray<NSNumber *> *)axes;
 - (void)sendText:(NSString *)text;
 - (void)sendCommittedText:(NSString *)text;
 - (void)switchToDisplay:(NSInteger)displayIndex;

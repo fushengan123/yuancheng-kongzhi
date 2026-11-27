@@ -83,6 +83,8 @@ class ConfigCenter {
   int SetSaveRemotePreviews(bool enabled);
   int SetPauseVideoWhenMinimized(bool enabled);
   int SetInputSensitivity(const std::string& device, int mouse_percent, int wheel_percent);
+  // feature/parity: per-device serialized key mapping profile.
+  int SetKeyMap(const std::string& device, const std::string& profile);
   int SetStreamWindowSize(const std::string& device, StreamWindowSize size);
   int SetPortableServicePromptSuppressed(bool suppressed);
   int SetLastPresentedRelease(const std::string& version);
@@ -121,6 +123,7 @@ class ConfigCenter {
   bool IsPauseVideoWhenMinimized() const;
   int GetMouseSensitivityPercent() const { return mouse_sensitivity_percent_.load(); }
   int GetWheelSensitivityPercent(const std::string& device) const;
+  std::string GetKeyMap(const std::string& device) const;
   std::optional<StreamWindowSize> GetStreamWindowSize(const std::string& device) const;
   bool IsPortableServicePromptSuppressed() const;
   std::string GetLastPresentedRelease() const;
@@ -173,6 +176,7 @@ class ConfigCenter {
   std::atomic<int> mouse_sensitivity_percent_{100};
   int legacy_wheel_sensitivity_percent_ = 100;
   std::map<std::string, int> device_wheel_sensitivity_;
+  std::map<std::string, std::string> device_keymaps_;
   bool portable_service_prompt_suppressed_ = false;
   std::string last_presented_release_;
   std::string file_transfer_save_path_ = "";
