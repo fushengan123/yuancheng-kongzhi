@@ -17,6 +17,11 @@ on:
         required: false
         default: com.lantest.crossdesk
         type: string
+      source_ref:
+        description: "Git ref to build (for example feature/parity)"
+        required: false
+        default: feature/parity
+        type: string
 
 permissions:
   contents: read
@@ -31,6 +36,7 @@ jobs:
       - name: Checkout code and submodules
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.source_ref }}
           submodules: recursive
 
       - name: Ensure minimum Xmake version
@@ -78,6 +84,7 @@ jobs:
       - name: Checkout code and submodules
         uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.source_ref }}
           submodules: recursive
           fetch-depth: 0
 
