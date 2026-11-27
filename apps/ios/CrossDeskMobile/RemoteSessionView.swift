@@ -470,6 +470,10 @@ struct RemoteSessionView: View {
                                 statusMenuVisible = false
                                 keyboardInputVisible.toggle()
                             },
+                            showKeyMap: {
+                                statusMenuVisible = false
+                                showingKeyMapEditor = true
+                            },
                             chooseFile: {
                                 statusMenuVisible = false
                                 keyboardInputVisible = false
@@ -1161,6 +1165,7 @@ private struct FloatingSessionMenu: View {
     @State private var displayedNetworkSnapshot: RemoteNetworkSnapshot
     @State private var displayedFrameSize: CGSize
     let showKeyboard: () -> Void
+    let showKeyMap: () -> Void
     let chooseFile: () -> Void
     let close: () -> Void
     let disconnect: () -> Void
@@ -1176,6 +1181,7 @@ private struct FloatingSessionMenu: View {
          toggleMouse: @escaping () -> Void,
          releaseMouse: @escaping () -> Void,
          showKeyboard: @escaping () -> Void,
+         showKeyMap: @escaping () -> Void,
          chooseFile: @escaping () -> Void,
          close: @escaping () -> Void,
          disconnect: @escaping () -> Void) {
@@ -1185,6 +1191,7 @@ private struct FloatingSessionMenu: View {
         self.toggleMouse = toggleMouse
         self.releaseMouse = releaseMouse
         self.showKeyboard = showKeyboard
+        self.showKeyMap = showKeyMap
         self.chooseFile = chooseFile
         self.close = close
         self.disconnect = disconnect
@@ -1291,10 +1298,8 @@ private struct FloatingSessionMenu: View {
                 LazyVGrid(columns: columns, spacing: 7) {
                     FloatingControlButton(title: NSLocalizedString("键盘", comment: ""), symbol: "keyboard",
                                           action: showKeyboard)
-                    FloatingControlButton(title: NSLocalizedString("按键映射", comment: ""), symbol: "gamecontroller") {
-                        statusMenuVisible = false
-                        showingKeyMapEditor = true
-                    }
+                    FloatingControlButton(title: NSLocalizedString("按键映射", comment: ""), symbol: "gamecontroller",
+                                          action: showKeyMap)
                     FloatingControlButton(title: virtualMouseVisible ? NSLocalizedString("收起鼠标", comment: "") : NSLocalizedString("虚拟鼠标", comment: ""),
                                           symbol: "computermouse", action: toggleMouse)
                     FloatingControlButton(

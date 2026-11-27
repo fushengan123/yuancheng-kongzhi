@@ -75,7 +75,7 @@ jobs:
   ios:
     if: ${{ inputs.platform == 'ios' || inputs.platform == 'both' }}
     name: iOS unsigned sideload build
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       IOS_DEPLOYMENT_TARGET: "16.0"
@@ -87,6 +87,14 @@ jobs:
           ref: ${{ inputs.source_ref }}
           submodules: recursive
           fetch-depth: 0
+
+      - name: Select Xcode 26.6
+        shell: bash
+        run: |
+          if [ -d /Applications/Xcode_26.6.app/Contents/Developer ]; then
+            sudo xcode-select -s /Applications/Xcode_26.6.app/Contents/Developer
+          fi
+          xcodebuild -version
 
       - name: Set up Python
         uses: actions/setup-python@v6
