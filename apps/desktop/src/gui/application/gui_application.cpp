@@ -6442,7 +6442,7 @@ void GuiApplication::SubmitAccount(const std::string& username,
           result.username.empty() ? username : result.username;
       config_center_->SetAccountSession(account_username_, account_token_);
       main->set_account_signed_in(true);
-      main->set_account_username(account_username_);
+      main->set_account_username(UiText(account_username_));
       main->set_account_status("");
       RefreshAccount();
     });
