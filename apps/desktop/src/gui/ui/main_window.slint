@@ -14,6 +14,7 @@ import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint";
 import { GalleryView, GalleryTile, GalleryRecentDevice, GalleryActionDevice } from "gallery_view.slint";
 import { GalleryNetworkDialog, GalleryNetworkDevice } from "gallery_network_dialog.slint";
+import { AccountDialog, AccountDevice } from "account_dialog.slint";
 import { SettingsDialog, SettingsButton, SettingsSelect, SettingsGroup, SettingsRow, SettingsToggleRow, SettingsHintToggleRow } from "settings_controls.slint";
 import { GallerySettings } from "gallery_settings.slint";
 import { GroupFilter } from "group_filter.slint";
@@ -389,6 +390,16 @@ export component MainWindow inherits Window {
         focus-sink.focus();
     }
     in-out property <bool> gallery-network-open: false;
+    in-out property <bool> account-open: false;
+    in property <bool> account-busy: false;
+    in property <bool> account-signed-in: false;
+    in property <string> account-username: "";
+    in property <string> account-status: "";
+    in property <[AccountDevice]> account-devices;
+    callback account-submit(string, string, bool);
+    callback account-connect(string, string);
+    callback account-refresh();
+    callback account-logout();
     in property <int> gallery-resolution-index: 0;
     in property <int> gallery-frame-rate-index: 0;
     in property <int> gallery-bandwidth-index: 3;
@@ -2144,6 +2155,7 @@ export component MainWindow inherits Window {
             tile-width <=> root.gallery-tile-width;
             focus-rail-height <=> root.gallery-focus-rail-height;
             network-open => { root.gallery-network-open = true; }
+            account-open => { root.account-open = true; root.account-refresh(); }
             controlling: root.gallery-controlling;
             remote-cursor-shape: root.gallery-remote-cursor-shape;
             group-controlling: root.gallery-group-controlling;
@@ -4210,6 +4222,19 @@ export component MainWindow inherits Window {
                 }
             }
         }
+    }
+
+    if root.account-open: AccountDialog {
+        busy: root.account-busy;
+        signed-in: root.account-signed-in;
+        username: root.account-username;
+        status: root.account-status;
+        devices: root.account-devices;
+        submit(username, password, create) => { root.account-submit(username, password, create); }
+        connect(id, password) => { root.account-connect(id, password); }
+        refresh => { root.account-refresh(); }
+        logout => { root.account-logout(); }
+        close => { root.account-open = false; }
     }
 
 }

@@ -1,0 +1,159 @@
+import { FlatSurface, UiSurface } from "ui_surface.slint";
+import { UiRadius } from "ui_radius.slint";
+import { RoundedLineEdit } from "rounded_line_edit.slint";
+import { PrimaryButton, SecondaryButton } from "common.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export struct AccountDevice {
+    id: string,
+    alias: string,
+    online: bool,
+    password: string,
+}
+
+export component AccountDialog inherits Rectangle {
+    in property <bool> busy: false;
+    in property <bool> signed-in: false;
+    in property <string> username: "";
+    in property <string> status: "";
+    in property <[AccountDevice]> devices;
+    in-out property <bool> register-mode: false;
+    callback submit(string, string, bool);
+    callback connect(string, string);
+    callback refresh();
+    callback logout();
+    callback close();
+
+    width: parent.width; height: parent.height;
+    background: #00000042;
+    TouchArea { }
+
+    card := FlatSurface {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: min(480px, parent.width - 24px);
+        height: min(560px, parent.height - 24px);
+        background: white;
+        border-radius: UiRadius.surface;
+        outline-color: UiSurface.edge;
+
+        Text {
+            x: 20px; y: 16px; height: 24px;
+            text: "账号与设备"; font-size: 16px; font-weight: 600;
+        }
+        SecondaryButton {
+            x: parent.width - 84px; y: 14px; width: 64px; height: 28px;
+            text: "关闭";
+            clicked => { root.close(); }
+        }
+
+        if !root.signed-in: VerticalLayout {
+            x: 20px; y: 64px; width: parent.width - 40px; height: parent.height - 84px;
+            spacing: 8px;
+            Text {
+                text: root.register-mode ? "注册账号" : "登录账号";
+                font-size: 13px; font-weight: 600; color: #293746; height: 20px;
+            }
+            Text { text: "用户名"; font-size: 11px; color: #6b7785; height: 16px; }
+            username-input := RoundedLineEdit {
+                height: 32px;
+                placeholder-text: "3-32 位字母、数字、下划线或点";
+                font-size: 12px;
+            }
+            Text { text: "密码"; font-size: 11px; color: #6b7785; height: 16px; }
+            password-input := RoundedLineEdit {
+                height: 32px;
+                placeholder-text: "至少 8 位";
+                font-size: 12px;
+            }
+            HorizontalLayout {
+                height: 34px; spacing: 8px;
+                PrimaryButton {
+                    text: root.register-mode ? "注册并登录" : "登录";
+                    enabled: !root.busy;
+                    clicked => {
+                        root.submit(username-input.text, password-input.text,
+                                    root.register-mode);
+                    }
+                }
+                SecondaryButton {
+                    text: root.register-mode ? "已有账号" : "注册新账号";
+                    clicked => { root.register-mode = !root.register-mode; }
+                }
+            }
+            if root.busy: Text {
+                text: "正在连接账号服务…"; font-size: 11px; color: #6b7785;
+                height: 20px;
+            }
+            if root.status != "": Text {
+                text: root.status; font-size: 11px; color: #8e4740;
+                wrap: word-wrap;
+            }
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        if root.signed-in: VerticalLayout {
+            x: 20px; y: 64px; width: parent.width - 40px; height: parent.height - 84px;
+            spacing: 8px;
+            HorizontalLayout {
+                height: 30px; spacing: 8px;
+                Text {
+                    text: root.username; font-size: 14px; font-weight: 600;
+                    color: #293746; vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                SecondaryButton {
+                    text: "刷新"; width: 56px; height: 28px;
+                    clicked => { root.refresh(); }
+                }
+                SecondaryButton {
+                    text: "退出"; width: 56px; height: 28px;
+                    clicked => { root.logout(); }
+                }
+            }
+            Text { text: "同账号设备"; font-size: 11px; color: #6b7785; height: 18px; }
+            ScrollView {
+                vertical-stretch: 1;
+                viewport-width: self.width;
+                vertical-scrollbar-policy: as-needed;
+                VerticalLayout {
+                    spacing: 6px;
+                    for device in root.devices: Rectangle {
+                        height: 54px;
+                        border-radius: UiRadius.control;
+                        background: #f7f9fc;
+                        border-width: 1px; border-color: UiSurface.edge;
+                        Text {
+                            x: 12px; y: 8px; height: 20px;
+                            text: device.alias != "" ? device.alias : device.id;
+                            font-size: 13px; font-weight: 600; color: #293746;
+                        }
+                        Text {
+                            x: 12px; y: 29px; height: 16px;
+                            text: device.id + (device.online ? "  ·  在线" : "  ·  离线");
+                            font-size: 10px;
+                            color: device.online ? #18a058 : #98a2b3;
+                        }
+                        SecondaryButton {
+                            x: parent.width - 76px; y: 13px; width: 64px; height: 28px;
+                            text: "连接";
+                            enabled: !root.busy && device.password != "";
+                            clicked => { root.connect(device.id, device.password); }
+                        }
+                    }
+                    if root.devices.length == 0: Text {
+                        text: "还没有绑定设备"; font-size: 12px; color: #8b93a1;
+                        height: 40px; vertical-alignment: center;
+                    }
+                }
+            }
+            if root.busy: Text {
+                text: "正在同步…"; font-size: 11px; color: #6b7785; height: 18px;
+            }
+            if root.status != "": Text {
+                text: root.status; font-size: 11px; color: #8e4740;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

@@ -40,6 +40,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/account_client.h"
 #include "crossdesk_ui.h"
 #include "fa_solid_900.h"
 #include "features/about/about_catalog.h"
@@ -1903,6 +1904,26 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
       });
   main->on_gallery_import_recent([this](slint::SharedString group) {
     return ImportGalleryRecent(std::string(group));
+  });
+  main->on_account_submit([this](slint::SharedString username,
+                                 slint::SharedString password, bool create) {
+    SubmitAccount(std::string(username), std::string(password), create);
+  });
+  main->on_account_connect([this](slint::SharedString id,
+                                  slint::SharedString password) {
+    ConnectAccountDevice(std::string(id), std::string(password));
+  });
+  main->on_account_refresh([this] { RefreshAccount(); });
+  main->on_account_logout([this] {
+    account_token_.clear();
+    account_username_.clear();
+    if (ui_ && ui_->main) {
+      ui_->main->set_account_signed_in(false);
+      ui_->main->set_account_username("");
+      ui_->main->set_account_status("");
+      ui_->main->set_account_devices(
+          std::make_shared<slint::VectorModel<ui::AccountDevice>>());
+    }
   });
   main->on_device_group_action(
       [this, main](slint::SharedString action, slint::SharedString value) {
@@ -6312,6 +6333,81 @@ bool GuiApplication::AddGalleryDevice(const std::string& input,
   ui_->gallery_synced = {};
   ui_->wall->set_gallery_notice("");
   return true;
+}
+
+void GuiApplication::SubmitAccount(const std::string& username,
+                                     const std::string& password, bool create) {
+  if (!ui_ || !ui_->main || account_busy_.exchange(true)) return;
+  auto main = ui_->main;
+  main->set_account_busy(true);
+  main->set_account_status("正在连接账号服务…");
+  std::thread([this, main, username, password, create] {
+    auto result = account::Login(account::kDefaultHost, account::kDefaultPort,
+                                 username, password, create);
+    slint::invoke_from_event_loop([this, main, result, username] {
+      if (!ui_) return;
+      account_busy_.store(false);
+      main->set_account_busy(false);
+      if (!result.ok) {
+        main->set_account_status(result.error.empty() ? "登录失败"
+                                                      : result.error);
+        return;
+      }
+      account_token_ = result.token;
+      account_username_ =
+          result.username.empty() ? username : result.username;
+      main->set_account_signed_in(true);
+      main->set_account_username(account_username_);
+      main->set_account_status("");
+      RefreshAccount();
+    });
+  }).detach();
+}
+
+void GuiApplication::RefreshAccount() {
+  if (!ui_ || !ui_->main || account_token_.empty() ||
+      account_busy_.exchange(true))
+    return;
+  auto main = ui_->main;
+  const auto token = account_token_;
+  main->set_account_busy(true);
+  std::thread([this, main, token] {
+    auto result = account::Devices(account::kDefaultHost,
+                                   account::kDefaultPort, token);
+    slint::invoke_from_event_loop([this, main, result] {
+      if (!ui_) return;
+      account_busy_.store(false);
+      main->set_account_busy(false);
+      if (!result.ok) {
+        main->set_account_status(result.error.empty() ? "同步设备失败"
+                                                      : result.error);
+        return;
+      }
+      std::vector<ui::AccountDevice> devices;
+      devices.reserve(result.devices.size());
+      for (const auto& item : result.devices) {
+        ui::AccountDevice device{};
+        device.id = UiText(item.id);
+        device.alias = UiText(item.alias);
+        device.password = UiText(item.password);
+        device.online = item.online;
+        devices.push_back(std::move(device));
+      }
+      main->set_account_devices(
+          std::make_shared<slint::VectorModel<ui::AccountDevice>>(
+              std::move(devices)));
+      main->set_account_status("");
+    });
+  }).detach();
+}
+
+void GuiApplication::ConnectAccountDevice(const std::string& id,
+                                          const std::string& password) {
+  if (!ui_ || !ui_->main) return;
+  if (AddGalleryDevice(id, password, "", true)) {
+    ui_->main->set_account_open(false);
+    ui_->main->set_account_status("");
+  }
 }
 
 bool GuiApplication::ImportGalleryRecent(const std::string& input_group) {

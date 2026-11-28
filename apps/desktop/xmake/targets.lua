@@ -108,7 +108,7 @@ function setup_targets()
             add_files("apps/desktop/src/platform/windows/system_info.cpp",
                 "apps/desktop/src/platform/windows/screen_lock.cpp",
                 "apps/desktop/src/platform/windows/desktop_automation.cpp")
-            add_syslinks("Advapi32", "Wtsapi32", "Ole32", "OleAut32", "Uiautomationcore", {public = true})
+            add_syslinks("Advapi32", "Wtsapi32", "Ole32", "OleAut32", "Uiautomationcore", "Winhttp", {public = true})
         elseif is_os("macosx") then
             add_files("apps/desktop/src/platform/macos/system_info.cpp",
                 "apps/desktop/src/platform/macos/screen_lock.cpp",
