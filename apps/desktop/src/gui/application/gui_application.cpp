@@ -1920,7 +1920,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
     account_token_.clear();
     account_username_.clear();
     config_center_->SetAccountSession("", "");
-    if (ui_ && ui_->main) {
+    if (ui_) {
       ui_->main->set_account_signed_in(false);
       ui_->main->set_account_username("");
       ui_->main->set_account_status("");
@@ -1930,13 +1930,13 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
   });
   main->on_set_allow_remote_control([this](bool enabled) {
     config_center_->SetAllowRemoteControl(enabled);
-    if (ui_ && ui_->main)
+    if (ui_)
       ui_->main->set_remote_access_status(
           UiText(enabled ? "已允许他人远程控制" : "已关闭远程控制"));
   });
   main->on_set_verification_mode([this](int mode, slint::SharedString) {
     config_center_->SetVerificationMode(mode);
-    if (ui_ && ui_->main)
+    if (ui_)
       ui_->main->set_remote_access_status(UiText(
           mode == 0 ? "使用临时验证码" : mode == 1 ? "使用自定义验证码"
                                                    : "同时使用两种验证码"));
@@ -1944,7 +1944,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
   main->on_set_refresh_policy([this](int policy) {
     config_center_->SetRefreshPolicy(policy);
     next_password_refresh_ = {};
-    if (ui_ && ui_->main)
+    if (ui_)
       ui_->main->set_remote_access_status("刷新策略已保存");
   });
   main->on_refresh_local_code([this] { RefreshLocalPassword(); });
@@ -3793,7 +3793,7 @@ void GuiApplication::SyncAnnouncements() {
 }
 
 void GuiApplication::SyncMainWindow() {
-  if (ui_ && ui_->main) {
+  if (ui_) {
     ui_->main->set_account_signed_in(!account_token_.empty());
     ui_->main->set_account_username(UiText(account_username_));
     ui_->main->set_allow_remote_control(config_center_->IsAllowRemoteControl());
@@ -6379,7 +6379,7 @@ bool GuiApplication::AddGalleryDevice(const std::string& input,
 }
 
 void GuiApplication::RefreshLocalPassword() {
-  if (!ui_ || !ui_->main) return;
+  if (!ui_) return;
   if (ui_->main->get_lan_mode()) {
     ui_->main->invoke_lan_reset_password();
     return;
@@ -6421,7 +6421,7 @@ void GuiApplication::MaybeRefreshPasswordPeriodically() {
 
 void GuiApplication::SubmitAccount(const std::string& username,
                                      const std::string& password, bool create) {
-  if (!ui_ || !ui_->main || account_busy_.exchange(true)) return;
+  if (!ui_ || account_busy_.exchange(true)) return;
   auto main = ui_->main;
   main->set_account_busy(true);
   main->set_account_status("正在连接账号服务…");
@@ -6450,7 +6450,7 @@ void GuiApplication::SubmitAccount(const std::string& username,
 }
 
 void GuiApplication::RefreshAccount() {
-  if (!ui_ || !ui_->main || account_token_.empty() ||
+  if (!ui_ || account_token_.empty() ||
       account_busy_.exchange(true))
     return;
   auto main = ui_->main;
@@ -6488,7 +6488,7 @@ void GuiApplication::RefreshAccount() {
 
 void GuiApplication::ConnectAccountDevice(const std::string& id,
                                           const std::string& password) {
-  if (!ui_ || !ui_->main) return;
+  if (!ui_) return;
   if (AddGalleryDevice(id, password, "", true)) {
     ui_->main->set_account_open(false);
     ui_->main->set_account_status("");
