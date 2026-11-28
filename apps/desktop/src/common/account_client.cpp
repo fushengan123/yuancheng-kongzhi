@@ -2,7 +2,7 @@
  * CrossDesk account client (Windows WinHTTP).
  * SPDX-License-Identifier: GPL-3.0-only
  */
-#include "common/account_client.h"
+#include "account_client.h"
 
 #include <nlohmann/json.hpp>
 
