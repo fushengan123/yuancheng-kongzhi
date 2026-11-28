@@ -277,7 +277,10 @@ struct SignalServerConfiguration: Equatable {
     var historyEndpoint: String { CrossDeskRTCBridge.historyEndpoint(host, port: signalPort) }
     var history: ConnectionHistory { ConnectionHistory(endpoint: historyEndpoint) }
 
-    static let official = Self(host: "api.crossdesk.cn", signalPort: 9099)
+    // This build is pinned to the self-hosted server so mobile, desktop and the
+    // account service share one set of device IDs and verification codes. Using
+    // the public server here made codes set on the self-hosted box fail to match.
+    static let official = Self(host: "crossdesk.161.153.102.103.sslip.io", signalPort: 443)
     private static let customServerKey = "crossdesk.mobile.custom-signal-server"
 
     static func loadCustom() -> Self? {

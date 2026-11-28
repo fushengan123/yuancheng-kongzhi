@@ -465,6 +465,30 @@ private struct ConnectionHomeView: View {
                 Text(NSLocalizedString("远程桌面", comment: ""))
                     .font(.title3.weight(.bold))
                 Spacer()
+                // Explicit, always-visible account entry in the page body.
+                // The toolbar person icon was too subtle to be discovered.
+                Button {
+                    remoteIDFocused = false
+                    accountOpen = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: accountStore.signedIn
+                              ? "person.crop.circle.fill" : "person.crop.circle")
+                        Text(accountStore.signedIn
+                             ? accountStore.accountName
+                             : NSLocalizedString("账号登录", comment: ""))
+                            .lineLimit(1)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(connectionAccent)
+                    .padding(.horizontal, 12)
+                    .frame(height: 34)
+                    .background(connectionAccent.opacity(0.10),
+                                in: RoundedRectangle(cornerRadius: 10,
+                                                     style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("账号", comment: ""))
             }
 
             HStack(spacing: 10) {
