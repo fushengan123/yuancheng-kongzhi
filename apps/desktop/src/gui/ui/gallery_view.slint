@@ -7,7 +7,7 @@ import { GalleryMenuButton } from "gallery_menu_button.slint";
 import { GroupFilter } from "group_filter.slint";
 import { ScrollView } from "std-widgets.slint";
 import { RoundedLineEdit } from "rounded_line_edit.slint";
-import { CompactButton, SecondaryButton, IconButton, FontAwesomeIcons, ImGuiCheckBox, ControlStyle } from "common.slint";
+import { CompactButton, SecondaryButton, IconButton, FontAwesomeIcons, ImGuiCheckBox, ControlStyle, ToggleSwitch } from "common.slint";
 
 component GalleryButton inherits CompactButton {
     border-radius: UiRadius.control;
@@ -61,7 +61,7 @@ export component GalleryView inherits Rectangle {
     callback toggle-fullscreen;
     // Keep long localized actions and the selection summary visible at 640px.
     private property <length> toolbar-button-padding: root.width < 720px ? 8px : 12px;
-    private property <length> view-controls-width: compact-toggle.width + account-button.width + 42px;
+    private property <length> view-controls-width: compact-toggle.width + account-button.width + remote-button.width + 48px;
     private property <length> view-controls-space: root.view-controls-width + 6px;
     in property <bool> window-active: true;
     in-out property <float> tile-width: 216;
@@ -162,6 +162,9 @@ export component GalleryView inherits Rectangle {
         + GalleryStrings.texts[152];
     callback network-open;
     callback account-open();
+    callback remote-access-open();
+    in-out property <bool> allow-remote-control: true;
+    callback set-allow-remote-control(bool);
     in property <int> selected-count: 0;
     in property <bool> selected-audio-available: false;
     in property <bool> selected-audio-muted: false;
@@ -806,14 +809,24 @@ export component GalleryView inherits Rectangle {
         status-area := Rectangle {
             x: 0px; y: 0px; width: parent.width - 124px; height: parent.height;
             connection-count := Text {
-                x: 0px; width: min(self.preferred-width, parent.width - network-button.width - 12px); height: parent.height;
+                x: 0px; width: min(self.preferred-width, parent.width - 250px); height: parent.height;
                 text: root.group-controlling
                     ? GalleryStrings.texts[180]
                     : root.connected-summary;
                 color: #62666d; vertical-alignment: center; font-size: 11px; overflow: elide;
             }
+            Text {
+                x: parent.width - 184px; y: 0px; width: 78px; height: parent.height;
+                text: "允许远程"; font-size: 10px; color: #6b7785;
+                horizontal-alignment: right; vertical-alignment: center; overflow: elide;
+            }
+            ToggleSwitch {
+                x: parent.width - 100px; y: 2px;
+                checked <=> root.allow-remote-control;
+                toggled(value) => { root.set-allow-remote-control(value); }
+            }
             network-button := SecondaryButton {
-                x: connection-count.x + connection-count.width + 12px;
+                x: parent.width - 64px;
                 width: 64px; height: parent.height;
                 outline-color: UiSurface.edge; border-radius: UiRadius.control;
                 text: GalleryStrings.texts[181];
@@ -834,6 +847,11 @@ export component GalleryView inherits Rectangle {
     view-controls := HorizontalLayout {
         x: parent.width - (root.simplified ? 12px : 29px) - self.width;
         y: toolbar.y; width: root.view-controls-width; height: toolbar.height; spacing: 6px;
+        remote-button := GalleryToolbarButton {
+            horizontal-padding: root.toolbar-button-padding;
+            text: "远程";
+            clicked => { root.remote-access-open(); }
+        }
         account-button := GalleryToolbarButton {
             horizontal-padding: root.toolbar-button-padding;
             text: "账号";

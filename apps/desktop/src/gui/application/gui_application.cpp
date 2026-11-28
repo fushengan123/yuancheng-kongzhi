@@ -5780,6 +5780,7 @@ void GuiApplication::DisconnectSession(const std::string& remote_id) {
     ReleaseControl();
   else if (!gallery_group_control_id_.empty())
     ReleasePressedInput();
+  const bool had_established_session = props->connection_established_;
   keyboard_.ReleaseRemotePressedKeys(remote_id, "stream_window_closed");
   CloseRemoteSession(props);
   ResetRemoteSessionResources(props);
@@ -5788,7 +5789,7 @@ void GuiApplication::DisconnectSession(const std::string& remote_id) {
     remote_sessions_.erase(remote_id);
   }
   if (connection_dialog_target_ == remote_id) connection_dialog_target_.clear();
-  MaybeRefreshPasswordAfterSession();
+  if (had_established_session) MaybeRefreshPasswordAfterSession();
 }
 
 void GuiApplication::ResetPointerMotion() {
