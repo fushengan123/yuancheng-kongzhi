@@ -6396,8 +6396,8 @@ void GuiApplication::RefreshLocalPassword() {
 }
 
 void GuiApplication::MaybeRefreshPasswordAfterSession() {
-  if (!config_center_) return;
-  if (config_center_->GetRefreshPolicy() == 1) RefreshLocalPassword();
+  // Automatic refresh on disconnect caused reconnect loops with the peer
+  // service. Password changes now happen only from the explicit refresh UI.
 }
 
 void GuiApplication::MaybeRefreshPasswordPeriodically() {

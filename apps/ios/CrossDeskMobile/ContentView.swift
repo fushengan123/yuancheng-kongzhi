@@ -194,6 +194,8 @@ private struct ConnectionHomeView: View {
     @State private var groupFilter: String?
     @State private var groupDevice: RecentConnection?
     @State private var groupToDelete: (name: String, history: ConnectionHistory)?
+    @State private var accountOpen = false
+    @StateObject private var accountStore = MobileAccountStore()
 
     private let connectionAccent = Color(red: 0.18, green: 0.48, blue: 0.86)
     private let connectionAccentEnd = Color(red: 0.12, green: 0.38, blue: 0.78)
@@ -317,6 +319,9 @@ private struct ConnectionHomeView: View {
             }
             .allowsHitTesting(false)
         }
+        .sheet(isPresented: $accountOpen) {
+            MobileAccountView(session: session, store: accountStore)
+        }
         .sheet(isPresented: $passwordPromptVisible) {
             PasswordPromptView(remoteID: promptRemoteID,
                                password: $promptPassword,
@@ -387,6 +392,19 @@ private struct ConnectionHomeView: View {
             }
             .foregroundStyle(.primary)
             .disabled(session.isConnecting)
+        }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                remoteIDFocused = false
+                accountOpen = true
+            } label: {
+                Image(systemName: accountStore.signedIn ? "person.crop.circle.fill" : "person.crop.circle")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 40, height: 40)
+                    .background(Color(.secondarySystemGroupedBackground),
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .accessibilityLabel(NSLocalizedString("账号", comment: ""))
         }
         ToolbarItem(placement: .navigationBarTrailing) {
             NavigationLink(value: HomeDestination.settings) {
@@ -1219,5 +1237,145 @@ private struct ServerSettingsView: View {
         customServerHost = host
         customServerPort = String(portNumber)
         session.setCustomServer(SignalServerConfiguration(host: host, signalPort: portNumber))
+    }
+}
+
+
+// MARK: - Account
+
+struct MobileAccountDevice: Identifiable, Decodable {
+    let device_id: String
+    let alias: String
+    let password: String
+    let online: Bool?
+    var id: String { device_id }
+}
+
+@MainActor
+final class MobileAccountStore: ObservableObject {
+    @Published var username = ""
+    @Published var password = ""
+    @Published var createAccount = false
+    @Published var busy = false
+    @Published var error = ""
+    @Published var token = UserDefaults.standard.string(forKey: "crossdesk.account.token") ?? ""
+    @Published var accountName = UserDefaults.standard.string(forKey: "crossdesk.account.name") ?? ""
+    @Published var devices: [MobileAccountDevice] = []
+
+    private let host = "account.161.153.102.103.sslip.io"
+    private let port = 443
+    var signedIn: Bool { !token.isEmpty }
+
+    private func request(_ path: String, body: [String: Any], token: String? = nil) async throws -> [String: Any] {
+        var request = URLRequest(url: URL(string: "https://\(host):\(port)\(path)")!)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
+        if http.statusCode >= 400 {
+            throw NSError(domain: "account", code: http.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: (object["error"] as? String) ?? "HTTP \(http.statusCode)"])
+        }
+        return object
+    }
+
+    func submit() async {
+        busy = true; error = ""
+        defer { busy = false }
+        do {
+            let object = try await request("/api/account/login",
+                body: ["username": username, "password": password, "create": createAccount, "client": "ios"])
+            token = object["token"] as? String ?? ""
+            accountName = object["username"] as? String ?? username
+            UserDefaults.standard.set(token, forKey: "crossdesk.account.token")
+            UserDefaults.standard.set(accountName, forKey: "crossdesk.account.name")
+            await loadDevices()
+        } catch { self.error = error.localizedDescription }
+    }
+
+    func loadDevices() async {
+        guard signedIn else { return }
+        busy = true; error = ""
+        defer { busy = false }
+        do {
+            let object = try await request("/api/account/devices", body: [:], token: token)
+            let raw = object["devices"] as? [[String: Any]] ?? []
+            let data = try JSONSerialization.data(withJSONObject: raw)
+            devices = try JSONDecoder().decode([MobileAccountDevice].self, from: data)
+        } catch { self.error = error.localizedDescription }
+    }
+
+    func logout() {
+        token = ""; accountName = ""; devices = []
+        UserDefaults.standard.removeObject(forKey: "crossdesk.account.token")
+        UserDefaults.standard.removeObject(forKey: "crossdesk.account.name")
+    }
+}
+
+struct MobileAccountView: View {
+    @ObservedObject var session: RemoteSessionModel
+    @ObservedObject var store: MobileAccountStore
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if store.signedIn {
+                    Section(NSLocalizedString("已登录", comment: "")) {
+                        LabeledContent(NSLocalizedString("账号", comment: ""), value: store.accountName)
+                        Button(NSLocalizedString("退出登录", comment: ""), role: .destructive) { store.logout() }
+                    }
+                    Section(NSLocalizedString("我的设备", comment: "")) {
+                        if store.devices.isEmpty {
+                            Text(NSLocalizedString("暂无已绑定设备", comment: ""))
+                                .foregroundStyle(.secondary)
+                        }
+                        ForEach(store.devices) { device in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(device.alias.isEmpty ? device.device_id : device.alias)
+                                    Text(device.device_id).font(.caption).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button(NSLocalizedString("连接", comment: "")) {
+                                    session.remoteID = device.device_id
+                                    session.connect(password: device.password, rememberPassword: true)
+                                    dismiss()
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                        }
+                    }
+                } else {
+                    Section(NSLocalizedString("账号登录", comment: "")) {
+                        TextField(NSLocalizedString("用户名", comment: ""), text: $store.username)
+                            .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        SecureField(NSLocalizedString("密码", comment: ""), text: $store.password)
+                        Toggle(NSLocalizedString("注册新账号", comment: ""), isOn: $store.createAccount)
+                    }
+                    if !store.error.isEmpty {
+                        Section { Text(store.error).foregroundStyle(.red) }
+                    }
+                    Section {
+                        Button(store.createAccount ? NSLocalizedString("注册并登录", comment: "") : NSLocalizedString("登录", comment: "")) {
+                            Task { await store.submit() }
+                        }
+                        .disabled(store.busy || store.username.isEmpty || store.password.isEmpty)
+                    }
+                }
+            }
+            .navigationTitle(NSLocalizedString("账号", comment: ""))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(NSLocalizedString("关闭", comment: "")) { dismiss() }
+                }
+            }
+            .task { await store.loadDevices() }
+        }
     }
 }

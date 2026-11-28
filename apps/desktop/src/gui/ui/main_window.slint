@@ -15,7 +15,6 @@ import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint"
 import { GalleryView, GalleryTile, GalleryRecentDevice, GalleryActionDevice } from "gallery_view.slint";
 import { GalleryNetworkDialog, GalleryNetworkDevice } from "gallery_network_dialog.slint";
 import { AccountDialog, AccountDevice } from "account_dialog.slint";
-import { RemoteAccessDialog } from "remote_access_dialog.slint";
 import { SettingsDialog, SettingsButton, SettingsSelect, SettingsGroup, SettingsRow, SettingsToggleRow, SettingsHintToggleRow } from "settings_controls.slint";
 import { GallerySettings } from "gallery_settings.slint";
 import { GroupFilter } from "group_filter.slint";
@@ -1569,11 +1568,6 @@ export component MainWindow inherits Window {
                 x: 0px; y: 0px;
                 width: (parent.width - 16px) / 2; height: parent.height;
                 Text { x: 16px; y: 14px; width: parent.width - 132px; height: 24px; overflow: elide; text: UiStrings.local-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
-                WorkbenchButton {
-                    x: parent.width - 108px; y: 12px; width: 92px; height: 26px;
-                    quiet: true; text: "远程协助"; text-size: 11px; text-color: WorkbenchStyle.accent;
-                    clicked => { root.remote-access-open = true; }
-                }
                 if root.lan-mode: Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: GalleryStrings.texts[69]; font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
                 if !root.lan-mode: Text {
                     x: 16px; y: 38px; width: parent.width - 90px; height: 18px;
@@ -2223,7 +2217,6 @@ export component MainWindow inherits Window {
             focus-rail-height <=> root.gallery-focus-rail-height;
             network-open => { root.gallery-network-open = true; }
             account-open => { root.account-open = true; root.account-refresh(); }
-            remote-access-open => { root.remote-access-open = true; }
             allow-remote-control <=> root.allow-remote-control;
             set-allow-remote-control(value) => { root.set-allow-remote-control(value); }
             controlling: root.gallery-controlling;
@@ -4308,21 +4301,6 @@ export component MainWindow inherits Window {
         close => { root.account-open = false; }
     }
 
-    if root.remote-access-open: RemoteAccessDialog {
-        width: root.width; height: root.height;
-        device-id: root.local-id;
-        code: root.local-password;
-        allow <=> root.allow-remote-control;
-        verification-mode-index <=> root.verification-mode-index;
-        refresh-policy-index <=> root.refresh-policy-index;
-        status: root.remote-access-status;
-        set-allow(value) => { root.set-allow-remote-control(value); }
-        set-verification(index, code) => { root.set-verification-mode(index, code); }
-        set-refresh(index) => { root.set-refresh-policy(index); }
-        refresh-now => { root.refresh-local-code(); }
-        save-custom(code) => { root.save-custom-code(code); }
-        connect-partner(id) => { root.connect-partner(id); }
-        close => { root.remote-access-open = false; }
-    }
+
 
 }

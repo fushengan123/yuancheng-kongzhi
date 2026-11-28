@@ -61,7 +61,7 @@ export component GalleryView inherits Rectangle {
     callback toggle-fullscreen;
     // Keep long localized actions and the selection summary visible at 640px.
     private property <length> toolbar-button-padding: root.width < 720px ? 8px : 12px;
-    private property <length> view-controls-width: compact-toggle.width + account-button.width + remote-button.width + 48px;
+    private property <length> view-controls-width: compact-toggle.width + account-button.width + 48px;
     private property <length> view-controls-space: root.view-controls-width + 6px;
     in property <bool> window-active: true;
     in-out property <float> tile-width: 216;
@@ -847,11 +847,6 @@ export component GalleryView inherits Rectangle {
     view-controls := HorizontalLayout {
         x: parent.width - (root.simplified ? 12px : 29px) - self.width;
         y: toolbar.y; width: root.view-controls-width; height: toolbar.height; spacing: 6px;
-        remote-button := GalleryToolbarButton {
-            horizontal-padding: root.toolbar-button-padding;
-            text: "远程";
-            clicked => { root.remote-access-open(); }
-        }
         account-button := GalleryToolbarButton {
             horizontal-padding: root.toolbar-button-padding;
             text: "账号";

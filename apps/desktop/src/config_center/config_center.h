@@ -194,7 +194,7 @@ class ConfigCenter {
   std::string account_token_;
   bool allow_remote_control_ = true;
   int verification_mode_ = 0;
-  int refresh_policy_ = 1;
+  int refresh_policy_ = 5;
 };
 }  // namespace crossdesk
 #endif

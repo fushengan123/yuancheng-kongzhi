@@ -288,8 +288,8 @@ int ConfigCenter::Load() {
       ini_->GetLongValue(section_, "verification_mode", 0));
   if (verification_mode_ < 0 || verification_mode_ > 2) verification_mode_ = 0;
   refresh_policy_ =
-      static_cast<int>(ini_->GetLongValue(section_, "refresh_policy", 1));
-  if (refresh_policy_ < 0 || refresh_policy_ > 5) refresh_policy_ = 1;
+      static_cast<int>(ini_->GetLongValue(section_, "refresh_policy", 5));
+  if (refresh_policy_ < 0 || refresh_policy_ > 5) refresh_policy_ = 5;
 
   if (persist_config_migration && CommitIni() < 0) {
     return -1;
