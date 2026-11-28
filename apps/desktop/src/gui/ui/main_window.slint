@@ -1441,17 +1441,17 @@ export component MainWindow inherits Window {
         }
         account-button := WorkbenchButton {
             visible: !root.gallery-mode;
-            x: open-gallery-button.x + open-gallery-button.width + 8px;
-            y: open-gallery-button.y;
-            width: 64px; height: 28px;
+            x: menu-button.x - self.width - 8px;
+            y: menu-button.y;
+            width: 56px; height: 28px;
             normal-background: white;
-            text: "账号";
+            text: root.account-signed-in ? "账号" : "登录";
             z: 8;
             clicked => { root.account-open = true; root.account-refresh(); }
         }
         controlled-button := WorkbenchButton {
             visible: !root.gallery-mode && root.controllers.length > 0;
-            x: menu-button.x - self.width - 8px;
+            x: account-button.x - self.width - 8px;
             y: menu-button.y + (menu-button.height - self.height) / 2;
             z: 8;
             width: badge-content.preferred-width; height: 26px;
