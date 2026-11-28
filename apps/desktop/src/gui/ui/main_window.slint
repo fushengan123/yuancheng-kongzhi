@@ -1439,6 +1439,16 @@ export component MainWindow inherits Window {
             z: 8;
             clicked => { root.open-gallery(); }
         }
+        account-button := WorkbenchButton {
+            visible: !root.gallery-mode;
+            x: open-gallery-button.x + open-gallery-button.width + 8px;
+            y: open-gallery-button.y;
+            width: 64px; height: 28px;
+            normal-background: white;
+            text: "账号";
+            z: 8;
+            clicked => { root.account-open = true; root.account-refresh(); }
+        }
         controlled-button := WorkbenchButton {
             visible: !root.gallery-mode && root.controllers.length > 0;
             x: menu-button.x - self.width - 8px;
@@ -1853,9 +1863,39 @@ export component MainWindow inherits Window {
             }
         }
 
+        // Remote-assist settings stay visible on the main page.
+        FlatSurface {
+            x: 20px; y: 256px; width: parent.width - 40px; height: 56px;
+            background: white; border-radius: UiRadius.surface; outline-color: UiSurface.edge;
+            Text { x: 14px; y: 8px; height: 16px; text: "验证方式"; font-size: 10px; color: #7a8490; }
+            SettingsSelect {
+                x: 14px; y: 24px; width: 158px; height: 26px;
+                model: ["临时验证码", "自定义验证码", "两种都可用"];
+                current-index <=> root.verification-mode-index;
+                selected(index) => { root.set-verification-mode(index, ""); }
+            }
+            Text { x: 184px; y: 8px; height: 16px; text: "刷新设置"; font-size: 10px; color: #7a8490; }
+            SettingsSelect {
+                x: 184px; y: 24px; width: 158px; height: 26px;
+                model: ["立即刷新", "每次远控结束", "每小时", "每 12 小时", "每 24 小时", "关闭自动刷新"];
+                current-index <=> root.refresh-policy-index;
+                selected(index) => { root.set-refresh-policy(index); }
+            }
+            SecondaryButton {
+                x: 354px; y: 24px; width: 78px; height: 26px;
+                text: "立即刷新";
+                clicked => { root.refresh-local-code(); }
+            }
+            SecondaryButton {
+                x: 440px; y: 24px; width: 96px; height: 26px;
+                text: "自定义验证码";
+                clicked => { root.reset-password-open = true; }
+            }
+        }
+
         // Recent connections: previews, presence badges, and separate primary/overflow actions.
         recent-panel := TouchArea {
-            y: 260px;
+            y: 320px;
             height: parent.height - self.y;
             // This observer survives model resets that destroy hovered cards
             // before their has-hover changed handler can dismiss the details.
