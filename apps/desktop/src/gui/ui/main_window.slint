@@ -393,7 +393,7 @@ export component MainWindow inherits Window {
     in-out property <bool> gallery-network-open: false;
     in-out property <bool> account-open: false;
     in-out property <bool> remote-access-open: false;
-    in property <bool> allow-remote-control: true;
+    in-out property <bool> allow-remote-control: true;
     in-out property <int> verification-mode-index: 0;
     in-out property <int> refresh-policy-index: 1;
     in property <string> remote-access-status: "";
@@ -4269,7 +4269,7 @@ export component MainWindow inherits Window {
         width: root.width; height: root.height;
         device-id: root.local-id;
         code: root.local-password;
-        allow: root.allow-remote-control;
+        allow <=> root.allow-remote-control;
         verification-mode-index <=> root.verification-mode-index;
         refresh-policy-index <=> root.refresh-policy-index;
         status: root.remote-access-status;
