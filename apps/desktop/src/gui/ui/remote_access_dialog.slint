@@ -7,9 +7,9 @@ import { PrimaryButton, SecondaryButton, ToggleSwitch } from "common.slint";
 export component RemoteAccessDialog inherits Rectangle {
     in property <string> device-id: "";
     in property <string> code: "";
-    in property <bool> allow: true;
-    in property <int> verification-mode-index: 0;
-    in property <int> refresh-policy-index: 1;
+    in-out property <bool> allow: true;
+    in-out property <int> verification-mode-index: 0;
+    in-out property <int> refresh-policy-index: 1;
     in property <string> status: "";
     callback set-allow(bool);
     callback set-verification(int, string);

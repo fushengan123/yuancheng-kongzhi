@@ -4270,8 +4270,8 @@ export component MainWindow inherits Window {
         device-id: root.local-id;
         code: root.local-password;
         allow: root.allow-remote-control;
-        verification-mode-index: root.verification-mode-index;
-        refresh-policy-index: root.refresh-policy-index;
+        verification-mode-index <=> root.verification-mode-index;
+        refresh-policy-index <=> root.refresh-policy-index;
         status: root.remote-access-status;
         set-allow(value) => { root.set-allow-remote-control(value); }
         set-verification(index, code) => { root.set-verification-mode(index, code); }
