@@ -614,8 +614,7 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
 
     func connectionTarget(_ input: String) -> String? {
         if input.range(of: "^[0-9]{9}$", options: .regularExpression) != nil { return input }
-        if let endpoint = CrossDeskRTCBridge.directEndpoint(input) { return endpoint }
-        connectionFailureMessage = NSLocalizedString("请输入设备 ID 或有效的 IP 地址", comment: "")
+        connectionFailureMessage = NSLocalizedString("请输入有效的 9 位设备 ID", comment: "")
         return nil
     }
 

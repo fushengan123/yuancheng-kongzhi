@@ -124,7 +124,7 @@ int ConfigCenter::Load() {
   language_ = LanguageFromSetting(
       ini_->GetLongValue(section_, "language", LanguageSettingValue(language_)));
 
-  enable_ip_direct_ = ini_->GetBoolValue(section_, "enable_ip_direct", true);
+  enable_ip_direct_ = ini_->GetBoolValue(section_, "enable_ip_direct", false);
   connection_mode_ =
       enable_ip_direct_ &&
               std::strcmp(ini_->GetValue(section_, "connection_mode", "id"), "ip") == 0

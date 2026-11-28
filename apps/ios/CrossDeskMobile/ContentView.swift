@@ -468,7 +468,7 @@ private struct ConnectionHomeView: View {
             }
 
             HStack(spacing: 10) {
-                TextField(NSLocalizedString("设备 ID 或 IP 地址", comment: ""), text: groupedRemoteID)
+                TextField(NSLocalizedString("设备 ID", comment: ""), text: groupedRemoteID)
                     .keyboardType(.asciiCapable)
                     .textContentType(.username)
                     .textInputAutocapitalization(.never)

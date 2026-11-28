@@ -257,7 +257,7 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         LinearLayout connection=column();connection.setPadding(dp(18),dp(18),dp(18),dp(18));content.addView(ui.shadowCard(connection,20));
         connection.addView(text(L10n.tr("远程桌面"),20,true));ui.gap(connection,16);
         LinearLayout entry=row();connection.addView(entry,ui.size(-1,54));
-        remote=field(L10n.tr("设备 ID 或 IP 地址"), InputType.TYPE_CLASS_TEXT
+        remote=field(L10n.tr("设备 ID"), InputType.TYPE_CLASS_TEXT
                 | InputType.TYPE_TEXT_VARIATION_URI | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         remote.setImeOptions(remote.getImeOptions() | android.view.inputmethod.EditorInfo.IME_FLAG_FORCE_ASCII);
         remote.setTextSize(20);remote.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));
@@ -480,8 +480,8 @@ public final class MainActivity extends Activity implements NativeSession.Listen
         if (session != null || (passwordDialog != null && passwordDialog.isShowing()) ||
                 (privacyDialog != null && privacyDialog.isShowing())) return;
         hideKeyboard();
-        final String target = id.matches("[0-9]{9}") ? id : NativeSession.directEndpoint(id);
-        if (target.isEmpty()) { remote.setError(L10n.tr("请输入设备 ID 或有效的 IP 地址")); remote.requestFocus(); return; }
+        final String target = id.matches("[0-9]{9}") ? id : "";
+        if (target.isEmpty()) { remote.setError(L10n.tr("请输入有效的 9 位设备 ID")); remote.requestFocus(); return; }
         if (!target.equals(id())) remote.setText(formatId(target));
         if(!preferences.getBoolean("networkConsent",false)){consent(()->connectOrPrompt(target));return;}connectOrPrompt(target);
     }
