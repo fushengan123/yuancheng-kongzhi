@@ -15,6 +15,7 @@ import { DeviceGroupDialog, DeviceGroupOption } from "device_group_dialog.slint"
 import { GalleryView, GalleryTile, GalleryRecentDevice, GalleryActionDevice } from "gallery_view.slint";
 import { GalleryNetworkDialog, GalleryNetworkDevice } from "gallery_network_dialog.slint";
 import { AccountDialog, AccountDevice } from "account_dialog.slint";
+import { RemoteAccessDialog } from "remote_access_dialog.slint";
 import { SettingsDialog, SettingsButton, SettingsSelect, SettingsGroup, SettingsRow, SettingsToggleRow, SettingsHintToggleRow } from "settings_controls.slint";
 import { GallerySettings } from "gallery_settings.slint";
 import { GroupFilter } from "group_filter.slint";
@@ -391,6 +392,17 @@ export component MainWindow inherits Window {
     }
     in-out property <bool> gallery-network-open: false;
     in-out property <bool> account-open: false;
+    in-out property <bool> remote-access-open: false;
+    in property <bool> allow-remote-control: true;
+    in-out property <int> verification-mode-index: 0;
+    in-out property <int> refresh-policy-index: 1;
+    in property <string> remote-access-status: "";
+    callback set-allow-remote-control(bool);
+    callback set-verification-mode(int, string);
+    callback set-refresh-policy(int);
+    callback refresh-local-code();
+    callback save-custom-code(string);
+    callback connect-partner(string);
     in property <bool> account-busy: false;
     in property <bool> account-signed-in: false;
     in property <string> account-username: "";
@@ -1546,8 +1558,23 @@ export component MainWindow inherits Window {
             local-card := WorkbenchCard {
                 x: 0px; y: 0px;
                 width: (parent.width - 16px) / 2; height: parent.height;
-                Text { x: 16px; y: 14px; width: parent.width - 32px; height: 24px; overflow: elide; text: UiStrings.local-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
-                Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: root.lan-mode ? GalleryStrings.texts[69] : GalleryStrings.texts[70]; font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                Text { x: 16px; y: 14px; width: parent.width - 132px; height: 24px; overflow: elide; text: UiStrings.local-desktop; font-size: 16px; font-weight: 600; color: WorkbenchStyle.text; }
+                WorkbenchButton {
+                    x: parent.width - 108px; y: 12px; width: 92px; height: 26px;
+                    quiet: true; text: "远程协助"; text-size: 11px; text-color: WorkbenchStyle.accent;
+                    clicked => { root.remote-access-open = true; }
+                }
+                if root.lan-mode: Text { x: 16px; y: 38px; width: parent.width - 32px; height: 18px; text: GalleryStrings.texts[69]; font-size: 11px; color: WorkbenchStyle.muted; overflow: elide; }
+                if !root.lan-mode: Text {
+                    x: 16px; y: 38px; width: parent.width - 90px; height: 18px;
+                    text: "允许他人远程控制"; font-size: 11px; color: WorkbenchStyle.muted;
+                    vertical-alignment: center;
+                }
+                if !root.lan-mode: ToggleSwitch {
+                    x: parent.width - 54px; y: 37px;
+                    checked <=> root.allow-remote-control;
+                    toggled(value) => { root.set-allow-remote-control(value); }
+                }
                 local-address-label := Text { x: 16px; y: 68px; height: 18px; text: root.lan-mode ? GalleryStrings.texts[71] : UiStrings.local-id; font-size: 12px; color: WorkbenchStyle.muted; vertical-alignment: top; }
                 lan-switch-ip-metrics := Text {
                     visible: false; accessible-role: none;
@@ -4236,6 +4263,23 @@ export component MainWindow inherits Window {
         refresh => { root.account-refresh(); }
         logout => { root.account-logout(); }
         close => { root.account-open = false; }
+    }
+
+    if root.remote-access-open: RemoteAccessDialog {
+        width: root.width; height: root.height;
+        device-id: root.local-id;
+        code: root.local-password;
+        allow: root.allow-remote-control;
+        verification-mode-index: root.verification-mode-index;
+        refresh-policy-index: root.refresh-policy-index;
+        status: root.remote-access-status;
+        set-allow(value) => { root.set-allow-remote-control(value); }
+        set-verification(index, code) => { root.set-verification-mode(index, code); }
+        set-refresh(index) => { root.set-refresh-policy(index); }
+        refresh-now => { root.refresh-local-code(); }
+        save-custom(code) => { root.save-custom-code(code); }
+        connect-partner(id) => { root.connect-partner(id); }
+        close => { root.remote-access-open = false; }
     }
 
 }

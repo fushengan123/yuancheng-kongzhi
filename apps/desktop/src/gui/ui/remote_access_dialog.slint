@@ -1,0 +1,103 @@
+import { FlatSurface, UiSurface } from "ui_surface.slint";
+import { UiRadius } from "ui_radius.slint";
+import { RoundedLineEdit } from "rounded_line_edit.slint";
+import { SettingsSelect } from "settings_controls.slint";
+import { PrimaryButton, SecondaryButton, ToggleSwitch } from "common.slint";
+
+export component RemoteAccessDialog inherits Rectangle {
+    in property <string> device-id: "";
+    in property <string> code: "";
+    in property <bool> allow: true;
+    in property <int> verification-mode-index: 0;
+    in property <int> refresh-policy-index: 1;
+    in property <string> status: "";
+    callback set-allow(bool);
+    callback set-verification(int, string);
+    callback set-refresh(int);
+    callback refresh-now();
+    callback save-custom(string);
+    callback connect-partner(string);
+    callback close();
+
+    background: #00000042;
+    TouchArea { }
+
+    card := FlatSurface {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: min(520px, root.width - 24px);
+        height: min(580px, root.height - 24px);
+        background: white;
+        border-radius: UiRadius.surface;
+        outline-color: UiSurface.edge;
+
+        Text { x: 20px; y: 16px; height: 24px; text: "远程协助"; font-size: 17px; font-weight: 600; }
+        SecondaryButton { x: parent.width - 84px; y: 14px; width: 64px; height: 28px; text: "关闭"; clicked => { root.close(); } }
+
+        VerticalLayout {
+            x: 20px; y: 58px; width: parent.width - 40px; height: parent.height - 78px;
+            spacing: 8px;
+
+            FlatSurface {
+                height: 214px; background: #f8fafc; border-radius: UiRadius.control; outline-color: UiSurface.edge;
+                Text { x: 14px; y: 10px; height: 22px; text: "本设备"; font-size: 14px; font-weight: 600; }
+                Text { x: parent.width - 220px; y: 12px; width: 120px; height: 22px; text: "允许他人远程协助"; font-size: 11px; color: #5c6675; horizontal-alignment: right; vertical-alignment: center; }
+                ToggleSwitch { x: parent.width - 84px; y: 10px; checked <=> root.allow; toggled(value) => { root.set-allow(value); } }
+
+                Text { x: 14px; y: 46px; height: 16px; text: "本设备 ID"; font-size: 10px; color: #7a8490; }
+                Text { x: 14px; y: 64px; height: 30px; text: root.device-id; font-size: 22px; font-weight: 600; letter-spacing: 1px; color: #1f2733; }
+                Text { x: 230px; y: 46px; height: 16px; text: "验证码"; font-size: 10px; color: #7a8490; }
+                Text { x: 230px; y: 64px; height: 30px; text: root.code; font-size: 20px; font-weight: 600; letter-spacing: 2px; color: #1f2733; }
+
+                Text { x: 14px; y: 104px; height: 16px; text: "验证方式"; font-size: 10px; color: #7a8490; }
+                SettingsSelect {
+                    x: 14px; y: 122px; width: 220px; height: 28px;
+                    model: ["仅使用临时验证码", "仅使用自定义验证码", "同时使用两种验证码"];
+                    current-index <=> root.verification-mode-index;
+                    selected(index) => { root.set-verification(index, root.code); }
+                }
+                Text { x: 246px; y: 104px; height: 16px; text: "刷新设置"; font-size: 10px; color: #7a8490; }
+                SettingsSelect {
+                    x: 246px; y: 122px; width: parent.width - 260px; height: 28px;
+                    model: ["立即刷新", "每次远控结束刷新", "每小时", "每 12 小时", "每 24 小时", "关闭自动刷新"];
+                    current-index <=> root.refresh-policy-index;
+                    selected(index) => { root.set-refresh(index); }
+                }
+
+                HorizontalLayout {
+                    x: 14px; y: 160px; width: parent.width - 28px; height: 30px; spacing: 8px;
+                    SecondaryButton { text: "刷新临时码"; enabled: root.verification-mode-index != 1; clicked => { root.refresh-now(); } }
+                    SecondaryButton { text: "保存自定义码"; enabled: root.verification-mode-index != 0; clicked => { root.save-custom(custom-input.text); } }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+                custom-input := RoundedLineEdit {
+                    x: 14px; y: 196px; width: 200px; height: 28px;
+                    placeholder-text: "自定义验证码（1-6 位）";
+                    font-size: 11px;
+                }
+                if root.status != "": Text {
+                    x: 222px; y: 196px; width: parent.width - 236px; height: 28px;
+                    text: root.status; font-size: 10px; color: #59636d; wrap: word-wrap;
+                    vertical-alignment: center;
+                }
+            }
+
+            FlatSurface {
+                vertical-stretch: 1; background: #f8fafc; border-radius: UiRadius.control; outline-color: UiSurface.edge;
+                Text { x: 14px; y: 10px; height: 22px; text: "伙伴设备"; font-size: 14px; font-weight: 600; }
+                Text { x: 14px; y: 36px; width: parent.width - 28px; height: 18px; text: "输入对方的设备 ID，连接后按提示输入验证码。"; font-size: 10px; color: #7a8490; }
+                partner-input := RoundedLineEdit {
+                    x: 14px; y: 64px; width: parent.width - 120px; height: 32px;
+                    placeholder-text: "请输入设备 ID";
+                    font-size: 12px;
+                }
+                PrimaryButton {
+                    x: parent.width - 96px; y: 64px; width: 82px; height: 32px;
+                    text: "连接";
+                    enabled: partner-input.text != "";
+                    clicked => { root.connect-partner(partner-input.text); }
+                }
+            }
+        }
+    }
+}

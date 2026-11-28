@@ -91,6 +91,12 @@ class ConfigCenter {
   int SetFileTransferSavePath(const std::string& path);
   // Account session for the self-hosted device portal.
   int SetAccountSession(const std::string& username, const std::string& token);
+  int SetAllowRemoteControl(bool enabled);
+  bool IsAllowRemoteControl() const { return allow_remote_control_; }
+  int SetVerificationMode(int mode);
+  int GetVerificationMode() const { return verification_mode_; }
+  int SetRefreshPolicy(int policy);
+  int GetRefreshPolicy() const { return refresh_policy_; }
   std::string GetAccountUsername() const { return account_username_; }
   std::string GetAccountToken() const { return account_token_; }
 
@@ -186,6 +192,9 @@ class ConfigCenter {
   std::string file_transfer_save_path_ = "";
   std::string account_username_;
   std::string account_token_;
+  bool allow_remote_control_ = true;
+  int verification_mode_ = 0;
+  int refresh_policy_ = 1;
 };
 }  // namespace crossdesk
 #endif

@@ -282,6 +282,14 @@ int ConfigCenter::Load() {
   const char* account_token_value =
       ini_->GetValue(section_, "account_token", nullptr);
   account_token_ = account_token_value != nullptr ? account_token_value : "";
+  allow_remote_control_ =
+      ini_->GetBoolValue(section_, "allow_remote_control", true);
+  verification_mode_ = static_cast<int>(
+      ini_->GetLongValue(section_, "verification_mode", 0));
+  if (verification_mode_ < 0 || verification_mode_ > 2) verification_mode_ = 0;
+  refresh_policy_ =
+      static_cast<int>(ini_->GetLongValue(section_, "refresh_policy", 1));
+  if (refresh_policy_ < 0 || refresh_policy_ > 5) refresh_policy_ = 1;
 
   if (persist_config_migration && CommitIni() < 0) {
     return -1;
@@ -391,6 +399,9 @@ int ConfigCenter::Save() {
                 file_transfer_save_path_.c_str());
   ini_->SetValue(section_, "account_username", account_username_.c_str());
   ini_->SetValue(section_, "account_token", account_token_.c_str());
+  ini_->SetBoolValue(section_, "allow_remote_control", allow_remote_control_);
+  ini_->SetLongValue(section_, "verification_mode", verification_mode_);
+  ini_->SetLongValue(section_, "refresh_policy", refresh_policy_);
 
   SI_Error rc = CommitIni();
   if (rc < 0) {
@@ -951,6 +962,27 @@ int ConfigCenter::SetFileTransferSavePath(const std::string& path) {
 std::string ConfigCenter::GetFileTransferSavePath() const {
   std::lock_guard<std::mutex> lock(file_path_mutex_);
   return file_transfer_save_path_;
+}
+
+int ConfigCenter::SetAllowRemoteControl(bool enabled) {
+  if (StoreValues({{"allow_remote_control", enabled ? "true" : "false"}}) != 0)
+    return -1;
+  allow_remote_control_ = enabled;
+  return 0;
+}
+
+int ConfigCenter::SetVerificationMode(int mode) {
+  if (mode < 0 || mode > 2) return -1;
+  if (StoreValues({{"verification_mode", std::to_string(mode)}}) != 0) return -1;
+  verification_mode_ = mode;
+  return 0;
+}
+
+int ConfigCenter::SetRefreshPolicy(int policy) {
+  if (policy < 0 || policy > 5) return -1;
+  if (StoreValues({{"refresh_policy", std::to_string(policy)}}) != 0) return -1;
+  refresh_policy_ = policy;
+  return 0;
 }
 
 int ConfigCenter::SetAccountSession(const std::string& username,

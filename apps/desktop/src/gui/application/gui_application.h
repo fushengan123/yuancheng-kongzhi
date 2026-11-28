@@ -90,6 +90,9 @@ private:
                      bool create);
   void RefreshAccount();
   void ConnectAccountDevice(const std::string& id, const std::string& password);
+  void RefreshLocalPassword();
+  void MaybeRefreshPasswordAfterSession();
+  void MaybeRefreshPasswordPeriodically();
   bool ImportGalleryRecent(const std::string& group);
   void DeviceGroupAction(const std::string& action, const std::string& value,
                          bool gallery_window);
@@ -166,6 +169,7 @@ private:
   std::string account_username_;
   std::string account_token_;
   std::atomic<bool> account_busy_{false};
+  std::chrono::steady_clock::time_point next_password_refresh_{};
   std::unique_ptr<SlintUi> ui_;
   std::unique_ptr<UpdateChecker> update_checker_;
 #if CROSSDESK_HAS_UPDATER

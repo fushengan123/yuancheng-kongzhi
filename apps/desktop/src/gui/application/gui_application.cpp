@@ -1928,6 +1928,36 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
           std::make_shared<slint::VectorModel<ui::AccountDevice>>());
     }
   });
+  main->on_set_allow_remote_control([this](bool enabled) {
+    config_center_->SetAllowRemoteControl(enabled);
+    if (ui_ && ui_->main)
+      ui_->main->set_remote_access_status(
+          UiText(enabled ? "已允许他人远程控制" : "已关闭远程控制"));
+  });
+  main->on_set_verification_mode([this](int mode, slint::SharedString) {
+    config_center_->SetVerificationMode(mode);
+    if (ui_ && ui_->main)
+      ui_->main->set_remote_access_status(UiText(
+          mode == 0 ? "使用临时验证码" : mode == 1 ? "使用自定义验证码"
+                                                   : "同时使用两种验证码"));
+  });
+  main->on_set_refresh_policy([this](int policy) {
+    config_center_->SetRefreshPolicy(policy);
+    next_password_refresh_ = {};
+    if (ui_ && ui_->main)
+      ui_->main->set_remote_access_status("刷新策略已保存");
+  });
+  main->on_refresh_local_code([this] { RefreshLocalPassword(); });
+  main->on_save_custom_code([this, main](slint::SharedString code) {
+    if (main->invoke_reset_password(code)) {
+      main->set_remote_access_status("自定义验证码已保存");
+    }
+  });
+  main->on_connect_partner([this, main](slint::SharedString id) {
+    main->set_remote_id_input(id);
+    main->set_remote_access_open(false);
+    ConnectFromUi(std::string(id));
+  });
   if (!account_token_.empty()) RefreshAccount();
   main->on_device_group_action(
       [this, main](slint::SharedString action, slint::SharedString value) {
@@ -3766,6 +3796,10 @@ void GuiApplication::SyncMainWindow() {
   if (ui_ && ui_->main) {
     ui_->main->set_account_signed_in(!account_token_.empty());
     ui_->main->set_account_username(UiText(account_username_));
+    ui_->main->set_allow_remote_control(config_center_->IsAllowRemoteControl());
+    ui_->main->set_verification_mode_index(config_center_->GetVerificationMode());
+    ui_->main->set_refresh_policy_index(config_center_->GetRefreshPolicy());
+    MaybeRefreshPasswordPeriodically();
   }
   if (!ui_) {
     return;
@@ -5754,6 +5788,7 @@ void GuiApplication::DisconnectSession(const std::string& remote_id) {
     remote_sessions_.erase(remote_id);
   }
   if (connection_dialog_target_ == remote_id) connection_dialog_target_.clear();
+  MaybeRefreshPasswordAfterSession();
 }
 
 void GuiApplication::ResetPointerMotion() {
@@ -6341,6 +6376,47 @@ bool GuiApplication::AddGalleryDevice(const std::string& input,
   ui_->gallery_synced = {};
   ui_->wall->set_gallery_notice("");
   return true;
+}
+
+void GuiApplication::RefreshLocalPassword() {
+  if (!ui_ || !ui_->main) return;
+  if (ui_->main->get_lan_mode()) {
+    ui_->main->invoke_lan_reset_password();
+    return;
+  }
+  const auto password = GenerateRandomPassword(password_saved_);
+  if (!password) {
+    LOG_ERROR("Could not generate a random password");
+    return;
+  }
+  RequestPasswordChange(*password);
+  next_password_refresh_ = {};
+  ui_->main->set_remote_access_status("临时验证码已刷新");
+}
+
+void GuiApplication::MaybeRefreshPasswordAfterSession() {
+  if (!config_center_) return;
+  if (config_center_->GetRefreshPolicy() == 1) RefreshLocalPassword();
+}
+
+void GuiApplication::MaybeRefreshPasswordPeriodically() {
+  if (!config_center_) return;
+  const int policy = config_center_->GetRefreshPolicy();
+  const int seconds = policy == 2 ? 3600 : policy == 3 ? 43200
+                      : policy == 4 ? 86400 : 0;
+  if (seconds <= 0) {
+    next_password_refresh_ = {};
+    return;
+  }
+  const auto now = std::chrono::steady_clock::now();
+  if (next_password_refresh_.time_since_epoch().count() == 0) {
+    next_password_refresh_ = now + std::chrono::seconds(seconds);
+    return;
+  }
+  if (now >= next_password_refresh_) {
+    next_password_refresh_ = now + std::chrono::seconds(seconds);
+    RefreshLocalPassword();
+  }
 }
 
 void GuiApplication::SubmitAccount(const std::string& username,
