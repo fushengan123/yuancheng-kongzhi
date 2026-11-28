@@ -776,6 +776,7 @@ private final class RemoteKeyboardFeedback: ObservableObject {
 private enum RemoteComputerKeyAction {
     case stroke(UInt)
     case modifier(UInt)
+    case command(UInt, [UInt])
     case switchKeyboard
     case dismiss
 }
@@ -851,6 +852,7 @@ private struct RemoteComputerKey {
 private enum RemoteComputerKeyboardPage: String, CaseIterable {
     case input = "字母数字"
     case controls = "符号功能"
+    case extra = "扩展键"
 
     var rows: [[RemoteComputerKey]] {
         let shift = RemoteComputerKey(symbol: "shift", 0x10, isModifier: true)
@@ -872,6 +874,26 @@ private enum RemoteComputerKeyboardPage: String, CaseIterable {
                 [shift, .init("Z", 0x5A), .init("X", 0x58), .init("C", 0x43),
                  .init("V", 0x56), .init("B", 0x42), .init("N", 0x4E),
                  .init("M", 0x4D), backspace]
+            ]
+        case .extra:
+            let win = UInt(0x5B)
+            let alt = UInt(0x12)
+            let ctrl = UInt(0x11)
+            return [
+                [.init("PrtSc", 0x2C), .init("Pause", 0x13), .init("Menu", 0x5D),
+                 .init("NumLk", 0x90), .init("ScrLk", 0x91), .init("Ins", 0x2D)],
+                [.init("Ctrl+Alt+Del", width: 2,
+                       action: .command(0x2E, [ctrl, alt])),
+                 .init("Alt+Tab", width: 1.5, action: .command(0x09, [alt])),
+                 .init("Win+D", width: 1.2, action: .command(0x44, [win])),
+                 .init("Win+E", width: 1.2, action: .command(0x45, [win]))],
+                [.init("Win+L", width: 1.2, action: .command(0x4C, [win])),
+                 .init("Win+Tab", width: 1.5, action: .command(0x09, [win])),
+                 .init("Alt+F4", width: 1.3, action: .command(0x73, [alt])),
+                 .init("复制", width: 1.2, action: .command(0x43, [ctrl])),
+                 .init("粘贴", width: 1.2, action: .command(0x56, [ctrl]))],
+                [shift, .init("←", 0x25), .init("↑", 0x26), .init("↓", 0x28),
+                 .init("→", 0x27), backspace]
             ]
         case .controls:
             return [
@@ -1040,6 +1062,9 @@ private struct RemoteComputerKeyboard: View {
             }
         case let .stroke(keyCode):
             session.sendKeyChord(keyCode, modifiers: Array(activeModifiers))
+            activeModifiers.removeAll()
+        case let .command(keyCode, modifiers):
+            session.sendKeyChord(keyCode, modifiers: modifiers)
             activeModifiers.removeAll()
         case .switchKeyboard:
             releaseModifiers()

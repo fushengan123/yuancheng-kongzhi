@@ -202,8 +202,8 @@ final class RemoteKeyboard extends LinearLayout {
         boolean landscape=getResources().getConfiguration().screenWidthDp>getResources().getConfiguration().screenHeightDp;
         String[][] upper;
         if(!functions)upper=new String[][]{{"1","2","3","4","5","6","7","8","9","0"},{"q","w","e","r","t","y","u","i","o","p"},{"a","s","d","f","g","h","j","k","l"}};
-        else if(landscape)upper=new String[][]{{"`","-","=","[","]","\\",";","'",",",".","/"},{"F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"},{"Esc","Tab","Caps","Ins","Del","Home","End"}};
-        else upper=new String[][]{{"`","-","=","[","]","\\",";","'",",",".","/"},{"F1","F2","F3","F4","F5","F6"},{"F7","F8","F9","F10","F11","F12"},{"Esc","Tab","Caps","Ins","Del","Home","End"}};
+        else if(landscape)upper=new String[][]{{"`","-","=","[","]","\\",";","'",",",".","/"},{"F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"},{"Esc","Tab","Caps","Ins","Del","Home","End"},{"PrtSc","Pause","Menu","NumLk","ScrLk"}};
+        else upper=new String[][]{{"`","-","=","[","]","\\",";","'",",",".","/"},{"F1","F2","F3","F4","F5","F6"},{"F7","F8","F9","F10","F11","F12"},{"Esc","Tab","Caps","Ins","Del","Home","End"},{"PrtSc","Pause","Menu","NumLk","ScrLk"}};
         LinearLayout upperKeys=ui.column();keys.addView(upperKeys,new LayoutParams(-1,0,1));
         for(String[] row:upper)upperKeys.addView(keyRow(row),new LayoutParams(-1,0,1));
         // The same bottom two rows keep their geometry on both pages.
@@ -238,7 +238,7 @@ final class RemoteKeyboard extends LinearLayout {
     }
     private void key(String value){
         int modifier=modifier(value);if(modifier!=0){if(!modifiers.add(modifier))modifiers.remove(modifier);render();return;}
-        int code=switch(value){case "空格"->32;case "Enter"->13;case "⌫"->8;case "Esc"->27;case "Tab"->9;case "Caps"->20;case "Ins"->45;case "Del"->46;case "Home"->36;case "End"->35;case "PgUp"->33;case "PgDn"->34;case "←"->37;case "↑"->38;case "→"->39;case "↓"->40;default->value.startsWith("F")?111+Integer.parseInt(value.substring(1)):KeyMap.ascii(value.charAt(0))&255;};
+        int code=switch(value){case "空格"->32;case "Enter"->13;case "⌫"->8;case "Esc"->27;case "Tab"->9;case "Caps"->20;case "Ins"->45;case "Del"->46;case "Home"->36;case "End"->35;case "PgUp"->33;case "PgDn"->34;case "←"->37;case "↑"->38;case "→"->39;case "↓"->40;case "PrtSc"->44;case "Pause"->19;case "Menu"->93;case "NumLk"->144;case "ScrLk"->145;default->value.startsWith("F")?111+Integer.parseInt(value.substring(1)):KeyMap.ascii(value.charAt(0))&255;};
         actions.chord(code,modifiers.stream().mapToInt(Integer::intValue).toArray());
         modifiers.clear();render();
     }
