@@ -619,6 +619,14 @@ std::shared_ptr<GuiRuntime::RemoteSession> GuiRuntime::FindRemoteSession(
 int GuiRuntime::ConnectTo(const std::string& remote_id, const char* password,
                           bool remember_password, bool bypass_presence_check,
                           bool background) {
+  // A device must never establish a remote-control session to itself.
+  // Reject before any peer/probe work so no self session can be created.
+  if (client_id_[0] != '\0' && remote_id == client_id_) {
+    offline_warning_text_ = "不能远程连接本机设备 ID";
+    show_offline_warning_window_ = true;
+    LOG_WARN("Refusing self connection to device [{}]", remote_id.c_str());
+    return -1;
+  }
   // Do not recreate a failed peer or send another probe during a server cooldown.
   if (const auto current = FindRemoteSession(remote_id);
       current && current->connection_auth_.Get().retry_after > 0) {

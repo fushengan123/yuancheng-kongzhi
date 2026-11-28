@@ -34,6 +34,11 @@ struct Response {
 Response Login(const std::string& host, int port, const std::string& username,
                const std::string& password, bool create);
 Response Devices(const std::string& host, int port, const std::string& token);
+// Bind this device to the signed-in account so it appears in the account's
+// device list. device_password is the local access code (1-6 alphanumeric).
+Response Bind(const std::string& host, int port, const std::string& token,
+              const std::string& device_id, const std::string& alias,
+              const std::string& device_password);
 
 }  // namespace account
 }  // namespace crossdesk

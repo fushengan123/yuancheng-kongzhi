@@ -635,6 +635,11 @@ final class RemoteSessionModel: NSObject, ObservableObject, CrossDeskRTCBridgeDe
         }
         connectionFailureMessage = nil
         guard let identifier = connectionTarget(remoteID.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        // A device must never open a remote-control session to itself.
+        if !localIdentity.isEmpty && identifier == localIdentity {
+            connectionFailureMessage = NSLocalizedString("不能远程连接本机设备 ID", comment: "")
+            return
+        }
         remoteID = identifier
         guard configureBridge() else {
             connectionStatus = signalStatus

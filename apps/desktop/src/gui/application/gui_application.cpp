@@ -4906,9 +4906,16 @@ void GuiApplication::SyncIncomingControllers() {
   std::vector<std::string> ids;
   ids.reserve(controllers.size());
   for (const auto& controller : controllers) ids.emplace_back(controller.remote_id);
+  // Edge: the last remote controller just disconnected. Refresh the local
+  // access code once ("每次远控结束") so the previous code no longer grants
+  // access. Comparing against the previous list avoids firing on network
+  // jitter or while another controller is still connected.
+  const bool last_controller_left =
+      !ui_->controller_ids.empty() && ids.empty();
   if (ids != ui_->controller_ids) ui_->main->set_confirming_disconnect(false);
   if (ids.empty()) ui_->main->set_controller_panel_open(false);
   ui_->controller_ids = std::move(ids);
+  if (last_controller_left) MaybeRefreshPasswordAfterSession();
   ui::UpdateModelRows(*ui_->controller_model, std::move(controllers));
   const int selected = server_window_state::ReconcileSelectedController(
       ui_->controller_ids, &selected_server_remote_id_);
@@ -5789,7 +5796,10 @@ void GuiApplication::DisconnectSession(const std::string& remote_id) {
     remote_sessions_.erase(remote_id);
   }
   if (connection_dialog_target_ == remote_id) connection_dialog_target_.clear();
-  if (had_established_session) MaybeRefreshPasswordAfterSession();
+  // Password refresh after a session belongs on the host side (see
+  // SyncIncomingControllers). Triggering it here on the guest side used to
+  // close the connection peer and cause reconnect loops.
+  (void)had_established_session;
 }
 
 void GuiApplication::ResetPointerMotion() {
@@ -6396,8 +6406,15 @@ void GuiApplication::RefreshLocalPassword() {
 }
 
 void GuiApplication::MaybeRefreshPasswordAfterSession() {
-  // Automatic refresh on disconnect caused reconnect loops with the peer
-  // service. Password changes now happen only from the explicit refresh UI.
+  // Refresh the local access code after a remote controller finishes a
+  // session ("每次远控结束"). This is the host-side direction: another device
+  // controlled this machine and has now disconnected. It must NOT be driven
+  // from DisconnectSession (the guest side), because a password change there
+  // closes the connection peer and used to cause reconnect loops.
+  if (!config_center_) return;
+  if (config_center_->GetRefreshPolicy() != 1) return;
+  if (password_change_pending_ || credential_recovery_in_progress_) return;
+  RefreshLocalPassword();
 }
 
 void GuiApplication::MaybeRefreshPasswordPeriodically() {
@@ -6457,7 +6474,17 @@ void GuiApplication::RefreshAccount() {
   auto main = ui_->main;
   const auto token = account_token_;
   main->set_account_busy(true);
-  std::thread([this, main, token] {
+  // Snapshot this device's identity/access code before leaving the UI thread.
+  const std::string self_id = client_id_[0] ? client_id_ : "";
+  const std::string self_password = password_saved_[0] ? password_saved_ : "";
+  std::thread([this, main, token, self_id, self_password] {
+    // Auto-bind this device to the account so it shows up in the device list
+    // of every device signed in with the same account. Binding is idempotent
+    // on the server (INSERT OR REPLACE); failures are non-fatal to listing.
+    if (!self_id.empty() && !self_password.empty()) {
+      account::Bind(account::kDefaultHost, account::kDefaultPort, token,
+                    self_id, self_id, self_password);
+    }
     auto result = account::Devices(account::kDefaultHost,
                                    account::kDefaultPort, token);
     slint::invoke_from_event_loop([this, main, result] {

@@ -155,5 +155,22 @@ Response Devices(const std::string& host, int port, const std::string& token) {
 #endif
 }
 
+Response Bind(const std::string& host, int port, const std::string& token,
+              const std::string& device_id, const std::string& alias,
+              const std::string& device_password) {
+#ifdef _WIN32
+  nlohmann::json body = {{"device_id", device_id},
+                         {"alias", alias},
+                         {"device_password", device_password}};
+  const auto result = Request(host, port, L"POST", L"/api/account/bind",
+                              body.dump(), token);
+  return Parse(result.body, result.status);
+#else
+  (void)host; (void)port; (void)token; (void)device_id;
+  (void)alias; (void)device_password;
+  return Response{false, 0, "当前平台暂不支持账号登录"};
+#endif
+}
+
 }  // namespace account
 }  // namespace crossdesk
