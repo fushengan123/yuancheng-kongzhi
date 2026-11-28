@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #include <openssl/rand.h>
 #include <remote_action.h>
+#include <wake_on_lan.h>
 #include <slint.h>
 #include <tinyfiledialogs.h>
 
@@ -13,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -2611,16 +2613,25 @@ void GuiApplication::BindStreamCallbacks(StreamView& view) {
     SetStreamKeyboardFocus(view, true);
   });
   stream->on_change_video_settings([&view](int quality, int frame_rate_index,
-                                          int preference) {
+                                          int preference, bool hdr,
+                                          int chroma) {
     const auto& props = view.session;
     if (!props->peer_ ||
         props->connection_status_.load() != MiniRtcConnectionStatus::MiniRtcConnectionConnected)
       return;
+    static constexpr int kRates[] = {30, 60, 120, 144};
     RemoteAction action{};
     action.type = ControlType::video_settings;
-    action.vs = {quality, frame_rate_index == 0 ? 30 : 60, preference};
-    if (frame_rate_index < 0 || frame_rate_index > 1 ||
-        !ValidVideoSettings(action.vs))
+    action.vs = {};
+    action.vs.quality = quality;
+    action.vs.frame_rate =
+        frame_rate_index >= 0 && frame_rate_index < 4
+            ? kRates[frame_rate_index] : 30;
+    action.vs.preference = preference;
+    action.vs.hdr = hdr;
+    action.vs.chroma = chroma;
+    if (frame_rate_index < 0 || frame_rate_index > 3 || chroma < 0 ||
+        chroma > 2 || !ValidVideoSettings(action.vs))
       return;
     {
       std::lock_guard lock(props->video_settings_mutex_);
@@ -2635,6 +2646,71 @@ void GuiApplication::BindStreamCallbacks(StreamView& view) {
       props->video_settings_failed_ = false;
       props->video_settings_request_tick_ = SDL_GetTicks();
     }
+  });
+  // feature/parity: remote tools in the session settings panel.
+  stream->on_send_wol([&view](slint::SharedString mac) {
+    const std::string value(mac.data(), mac.size());
+    std::string error;
+    const bool sent = crossdesk::wol::SendWakeOnLan(
+        "255.255.255.255", 9, value, &error);
+    view.window->set_tools_feedback(
+        sent ? slint::SharedString("已发送远程开机包")
+             : slint::SharedString("远程开机失败: " + error));
+  });
+  auto active_mapping_id = std::make_shared<std::atomic<uint32_t>>(0);
+  static std::atomic<uint32_t> mapping_sequence{0};
+  stream->on_start_port_mapping(
+      [&view, active_mapping_id](int listen_port,
+                                         slint::SharedString host,
+                                         int target_port) {
+        const auto& props = view.session;
+        if (!props->peer_ ||
+            props->connection_status_.load() !=
+                MiniRtcConnectionStatus::MiniRtcConnectionConnected) {
+          view.window->set_tools_feedback("连接未建立，无法开始端口映射");
+          return;
+        }
+        if (listen_port <= 0 || listen_port > 65535 || target_port <= 0 ||
+            target_port > 65535) {
+          view.window->set_tools_feedback("端口需在 1-65535 之间");
+          return;
+        }
+        const std::string target(host.data(), host.size());
+        RemoteAction action{};
+        action.type = ControlType::port_mapping_open;
+        const uint32_t id = ++mapping_sequence;
+        action.pmo.session_id = id;
+        action.pmo.listen_port = static_cast<uint32_t>(listen_port);
+        action.pmo.target_port = static_cast<uint32_t>(target_port);
+        std::snprintf(action.pmo.target_host, sizeof(action.pmo.target_host),
+                      "%s", target.empty() ? "127.0.0.1" : target.c_str());
+        const auto message = action.to_json();
+        if (MiniRtcSendReliableDataFrame(
+                props->peer_, message.data(), message.size(),
+                props->control_data_label_.c_str()) != 0) {
+          view.window->set_tools_feedback("端口映射请求发送失败");
+          return;
+        }
+        active_mapping_id->store(id);
+        view.window->set_port_mapping_active(true);
+        view.window->set_tools_feedback(
+            slint::SharedString("已请求映射 " + std::to_string(listen_port) +
+                                " -> " + std::string(action.pmo.target_host) +
+                                ":" + std::to_string(target_port)));
+      });
+  stream->on_stop_port_mapping([&view, active_mapping_id] {
+    const uint32_t id = active_mapping_id->exchange(0);
+    const auto& props = view.session;
+    if (id != 0 && props->peer_) {
+      RemoteAction action{};
+      action.type = ControlType::port_mapping_close;
+      action.pmc.session_id = id;
+      const auto message = action.to_json();
+      MiniRtcSendReliableDataFrame(props->peer_, message.data(), message.size(),
+                                   props->control_data_label_.c_str());
+    }
+    view.window->set_port_mapping_active(false);
+    view.window->set_tools_feedback("端口映射已停止");
   });
   stream->on_change_remote_resolution([this, &view](int index) {
     const auto& props = view.session;
@@ -4305,7 +4381,12 @@ void GuiApplication::SyncStreamWindow(StreamView& view) {
         props->video_settings_failed_
             ? localization::video_settings_failed[localization_language_index_] : ""));
     stream->set_video_quality_index(props->video_settings_.quality);
-    stream->set_frame_rate_index(props->video_settings_.frame_rate == 30 ? 0 : 1);
+    const int frame_rate = props->video_settings_.frame_rate;
+    stream->set_frame_rate_index(frame_rate == 30 ? 0
+                                   : frame_rate == 60 ? 1
+                                   : frame_rate == 120 ? 2 : 3);
+    stream->set_hdr_enabled(props->video_settings_.hdr);
+    stream->set_chroma_index(props->video_settings_.chroma);
     stream->set_adaptation_policy_index(props->video_settings_.preference);
   }
   view.ObserveWindowState();

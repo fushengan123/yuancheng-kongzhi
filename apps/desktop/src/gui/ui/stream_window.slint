@@ -2,6 +2,7 @@ import { SurfaceSeparator, FlatSurface, UiSurface } from "ui_surface.slint";
 import { UiRadius } from "ui_radius.slint";
 import { ScrollView, Slider } from "std-widgets.slint";
 import { SettingsSelect } from "settings_controls.slint";
+import { RoundedLineEdit } from "rounded_line_edit.slint";
 import { RemoteCursor, AdjustedPointer } from "remote_cursor.slint";
 import { EndpointPopup } from "detail_popup.slint";
 import { FontAwesomeIcons, IconButton, PrimaryButton, SecondaryButton, DialogSurface, ImGuiFontStyle, ControlStyle, ButtonStyle, ScrollingText, HoverTooltip } from "common.slint";
@@ -426,11 +427,23 @@ export component StreamWindow inherits Window {
     in-out property <int> video-quality-index: 2;
     in-out property <int> frame-rate-index: 1;
     in-out property <int> adaptation-policy-index: 1;
-    callback change-video-settings(int, int, int);
+    in-out property <bool> hdr-enabled: false;
+    in-out property <int> chroma-index: 0;
+    callback change-video-settings(int, int, int, bool, int);
     in-out property <float> mouse-sensitivity-percent: 100;
     in-out property <float> wheel-sensitivity-percent: 100;
     in property <string> sensitivity-error;
     callback save-input-sensitivity(int, int);
+    // feature/parity: remote tools exposed in the same settings panel.
+    in-out property <string> wol-mac: "";
+    in-out property <string> mapping-listen-port: "";
+    in-out property <string> mapping-target-host: "127.0.0.1";
+    in-out property <string> mapping-target-port: "";
+    in property <string> tools-feedback: "";
+    in property <bool> port-mapping-active: false;
+    callback send-wol(string);
+    callback start-port-mapping(int, string, int);
+    callback stop-port-mapping();
     function commit-input-sensitivity() {
         root.save-input-sensitivity(round(root.mouse-sensitivity-percent), round(root.wheel-sensitivity-percent));
     }
@@ -1870,18 +1883,30 @@ export component StreamWindow inherits Window {
                             label: StreamStrings.video-quality;
                             options: [StreamStrings.quality-low, StreamStrings.quality-medium, StreamStrings.quality-high];
                             selected: root.video-quality-index; enabled: root.video-settings-enabled;
-                            choose(index) => { root.change-video-settings(index, root.frame-rate-index, root.adaptation-policy-index); }
+                            choose(index) => { root.change-video-settings(index, root.frame-rate-index, root.adaptation-policy-index, root.hdr-enabled, root.chroma-index); }
                         }
                         VideoSettingRow {
-                            label: StreamStrings.frame-rate; options: ["30 fps", "60 fps"];
+                            label: StreamStrings.frame-rate; options: ["30 fps", "60 fps", "120 fps", "144 fps"];
                             selected: root.frame-rate-index; enabled: root.video-settings-enabled;
-                            choose(index) => { root.change-video-settings(root.video-quality-index, index, root.adaptation-policy-index); }
+                            choose(index) => { root.change-video-settings(root.video-quality-index, index, root.adaptation-policy-index, root.hdr-enabled, root.chroma-index); }
+                        }
+                        VideoSettingRow {
+                            label: "HDR";
+                            options: ["关", "开"];
+                            selected: root.hdr-enabled ? 1 : 0; enabled: root.video-settings-enabled;
+                            choose(index) => { root.hdr-enabled = index == 1; root.change-video-settings(root.video-quality-index, root.frame-rate-index, root.adaptation-policy-index, root.hdr-enabled, root.chroma-index); }
+                        }
+                        VideoSettingRow {
+                            label: "色度采样";
+                            options: ["4:2:0", "4:2:2", "4:4:4"];
+                            selected: root.chroma-index; enabled: root.video-settings-enabled;
+                            choose(index) => { root.chroma-index = index; root.change-video-settings(root.video-quality-index, root.frame-rate-index, root.adaptation-policy-index, root.hdr-enabled, index); }
                         }
                         VideoSettingRow {
                             label: StreamStrings.adaptation-policy;
                             options: [StreamStrings.priority-frame-rate, StreamStrings.priority-quality, StreamStrings.priority-balanced];
                             selected: root.adaptation-policy-index; enabled: root.video-settings-enabled;
-                            choose(index) => { root.change-video-settings(root.video-quality-index, root.frame-rate-index, index); }
+                            choose(index) => { root.change-video-settings(root.video-quality-index, root.frame-rate-index, index, root.hdr-enabled, root.chroma-index); }
                         }
                         if !root.video-settings-enabled || root.video-settings-feedback != "": Text {
                             text: root.video-settings-enabled ? root.video-settings-feedback : StreamStrings.video-settings-unavailable; wrap: word-wrap;
@@ -1899,6 +1924,57 @@ export component StreamWindow inherits Window {
                         }
                         if root.sensitivity-error != "": Text {
                             text: root.sensitivity-error; color: #59636d; font-size: 11px; wrap: word-wrap;
+                        }
+                        Text { text: "远程工具"; color: #5c626c; font-size: 11px; height: 18px; }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            RoundedLineEdit {
+                                width: 68%;
+                                text <=> root.wol-mac;
+                                placeholder-text: "MAC 00:11:22:33:44:55";
+                                font-size: 11px;
+                            }
+                            SecondaryButton {
+                                text: "远程开机"; horizontal-stretch: 1;
+                                clicked => { root.send-wol(root.wol-mac); }
+                            }
+                        }
+                        RoundedLineEdit {
+                            text <=> root.mapping-target-host;
+                            placeholder-text: "目标地址 127.0.0.1";
+                            font-size: 11px;
+                        }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            RoundedLineEdit {
+                                width: 34%;
+                                text <=> root.mapping-listen-port;
+                                placeholder-text: "本地端口";
+                                font-size: 11px;
+                            }
+                            RoundedLineEdit {
+                                width: 34%;
+                                text <=> root.mapping-target-port;
+                                placeholder-text: "目标端口";
+                                font-size: 11px;
+                            }
+                            SecondaryButton {
+                                text: root.port-mapping-active ? "停止映射" : "开始映射";
+                                horizontal-stretch: 1;
+                                clicked => {
+                                    if root.port-mapping-active {
+                                        root.stop-port-mapping();
+                                    } else {
+                                        root.start-port-mapping(
+                                            round(root.mapping-listen-port.to-float()),
+                                            root.mapping-target-host,
+                                            round(root.mapping-target-port.to-float()));
+                                    }
+                                }
+                            }
+                        }
+                        if root.tools-feedback != "": Text {
+                            text: root.tools-feedback; color: #59636d; font-size: 11px; wrap: word-wrap;
                         }
                     }
                 }
