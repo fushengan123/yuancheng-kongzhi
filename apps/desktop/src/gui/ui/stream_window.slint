@@ -444,6 +444,11 @@ export component StreamWindow inherits Window {
     callback send-wol(string);
     callback start-port-mapping(int, string, int);
     callback stop-port-mapping();
+    in-out property <string> keymap-source: "";
+    in-out property <string> keymap-target: "";
+    in property <string> keymap-feedback: "";
+    callback save-keymap(int, int);
+    callback clear-keymap();
     function commit-input-sensitivity() {
         root.save-input-sensitivity(round(root.mouse-sensitivity-percent), round(root.wheel-sensitivity-percent));
     }
@@ -1975,6 +1980,37 @@ export component StreamWindow inherits Window {
                         }
                         if root.tools-feedback != "": Text {
                             text: root.tools-feedback; color: #59636d; font-size: 11px; wrap: word-wrap;
+                        }
+                        Text { text: "按键映射（Windows VK）"; color: #5c626c; font-size: 11px; height: 18px; }
+                        HorizontalLayout {
+                            spacing: 4px;
+                            RoundedLineEdit {
+                                width: 28%;
+                                text <=> root.keymap-source;
+                                placeholder-text: "源键 VK";
+                                font-size: 11px;
+                            }
+                            RoundedLineEdit {
+                                width: 28%;
+                                text <=> root.keymap-target;
+                                placeholder-text: "目标键 VK";
+                                font-size: 11px;
+                            }
+                            SecondaryButton {
+                                text: "保存映射"; horizontal-stretch: 1;
+                                clicked => {
+                                    root.save-keymap(
+                                        round(root.keymap-source.to-float()),
+                                        round(root.keymap-target.to-float()));
+                                }
+                            }
+                            SecondaryButton {
+                                text: "清除"; horizontal-stretch: 1;
+                                clicked => { root.clear-keymap(); }
+                            }
+                        }
+                        if root.keymap-feedback != "": Text {
+                            text: root.keymap-feedback; color: #59636d; font-size: 11px; wrap: word-wrap;
                         }
                     }
                 }

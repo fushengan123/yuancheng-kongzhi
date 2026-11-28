@@ -2712,6 +2712,50 @@ void GuiApplication::BindStreamCallbacks(StreamView& view) {
     view.window->set_port_mapping_active(false);
     view.window->set_tools_feedback("端口映射已停止");
   });
+  stream->on_save_keymap([this, &view](int source, int target) {
+    const auto& props = view.session;
+    if (!props) return;
+    if (source <= 0 || source > 255 || target <= 0 || target > 255) {
+      view.window->set_keymap_feedback("键值需在 1-255 之间");
+      return;
+    }
+    const std::string device =
+        props->remote_id_.empty() ? props->device_preference_key_
+                                  : props->remote_id_;
+    if (device.empty()) {
+      view.window->set_keymap_feedback("当前会话没有可保存的设备标识");
+      return;
+    }
+    std::string rebuilt = "profile custom\n";
+    {
+      std::istringstream input(config_center_->GetKeyMap(device));
+      std::string line;
+      while (std::getline(input, line)) {
+        if (line.rfind("profile ", 0) == 0 || line.rfind("rule ui-", 0) == 0)
+          continue;
+        if (!line.empty()) rebuilt += line + "\n";
+      }
+    }
+    rebuilt += "rule ui-" + std::to_string(source) + " 1 key:" +
+               std::to_string(source) + " key:" + std::to_string(target) +
+               "\n";
+    if (config_center_->SetKeyMap(device, rebuilt) != 0) {
+      view.window->set_keymap_feedback("保存失败");
+      return;
+    }
+    view.window->set_keymap_feedback(slint::SharedString(
+        "已保存：源键 " + std::to_string(source) + " → 目标键 " +
+        std::to_string(target)));
+  });
+  stream->on_clear_keymap([this, &view] {
+    const auto& props = view.session;
+    if (!props) return;
+    const std::string device =
+        props->remote_id_.empty() ? props->device_preference_key_
+                                  : props->remote_id_;
+    if (!device.empty()) config_center_->SetKeyMap(device, "");
+    view.window->set_keymap_feedback("已清除本设备的按键映射");
+  });
   stream->on_change_remote_resolution([this, &view](int index) {
     const auto& props = view.session;
     if (!props->peer_ || props->closing_ || index < 0 ||
