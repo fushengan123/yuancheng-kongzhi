@@ -1288,6 +1288,8 @@ int GuiApplication::Run(bool login_launch) {
   announcements_.SetStorageDirectory(path_manager_->GetCachePath() /
                                      "announcement_reads");
   config_center_ = std::make_unique<ConfigCenter>(cache_path_ + "/config.ini");
+  account_username_ = config_center_->GetAccountUsername();
+  account_token_ = config_center_->GetAccountToken();
 #ifdef _WIN32
   if (SupportsServiceAutostart() && SharedHostIdentity::Configured()) {
     // User-session features attach after unlock; the persistent host keeps
@@ -1917,6 +1919,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
   main->on_account_logout([this] {
     account_token_.clear();
     account_username_.clear();
+    config_center_->SetAccountSession("", "");
     if (ui_ && ui_->main) {
       ui_->main->set_account_signed_in(false);
       ui_->main->set_account_username("");
@@ -1925,6 +1928,7 @@ void GuiApplication::BindMainCallbacks(bool gallery_window) {
           std::make_shared<slint::VectorModel<ui::AccountDevice>>());
     }
   });
+  if (!account_token_.empty()) RefreshAccount();
   main->on_device_group_action(
       [this, main](slint::SharedString action, slint::SharedString value) {
         DeviceGroupAction(std::string(action), std::string(value),
@@ -3759,6 +3763,10 @@ void GuiApplication::SyncAnnouncements() {
 }
 
 void GuiApplication::SyncMainWindow() {
+  if (ui_ && ui_->main) {
+    ui_->main->set_account_signed_in(!account_token_.empty());
+    ui_->main->set_account_username(UiText(account_username_));
+  }
   if (!ui_) {
     return;
   }
@@ -6349,13 +6357,14 @@ void GuiApplication::SubmitAccount(const std::string& username,
       account_busy_.store(false);
       main->set_account_busy(false);
       if (!result.ok) {
-        main->set_account_status(result.error.empty() ? "登录失败"
-                                                      : result.error);
+        main->set_account_status(UiText(result.error.empty() ? "登录失败"
+                                                             : result.error));
         return;
       }
       account_token_ = result.token;
       account_username_ =
           result.username.empty() ? username : result.username;
+      config_center_->SetAccountSession(account_username_, account_token_);
       main->set_account_signed_in(true);
       main->set_account_username(account_username_);
       main->set_account_status("");
@@ -6379,8 +6388,8 @@ void GuiApplication::RefreshAccount() {
       account_busy_.store(false);
       main->set_account_busy(false);
       if (!result.ok) {
-        main->set_account_status(result.error.empty() ? "同步设备失败"
-                                                      : result.error);
+        main->set_account_status(UiText(result.error.empty() ? "同步设备失败"
+                                                             : result.error));
         return;
       }
       std::vector<ui::AccountDevice> devices;

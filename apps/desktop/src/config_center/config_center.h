@@ -89,6 +89,10 @@ class ConfigCenter {
   int SetPortableServicePromptSuppressed(bool suppressed);
   int SetLastPresentedRelease(const std::string& version);
   int SetFileTransferSavePath(const std::string& path);
+  // Account session for the self-hosted device portal.
+  int SetAccountSession(const std::string& username, const std::string& token);
+  std::string GetAccountUsername() const { return account_username_; }
+  std::string GetAccountToken() const { return account_token_; }
 
   // read config
 
@@ -180,6 +184,8 @@ class ConfigCenter {
   bool portable_service_prompt_suppressed_ = false;
   std::string last_presented_release_;
   std::string file_transfer_save_path_ = "";
+  std::string account_username_;
+  std::string account_token_;
 };
 }  // namespace crossdesk
 #endif

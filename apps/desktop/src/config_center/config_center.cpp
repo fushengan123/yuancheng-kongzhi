@@ -275,6 +275,13 @@ int ConfigCenter::Load() {
   } else {
     file_transfer_save_path_ = "";
   }
+  const char* account_username_value =
+      ini_->GetValue(section_, "account_username", nullptr);
+  account_username_ =
+      account_username_value != nullptr ? account_username_value : "";
+  const char* account_token_value =
+      ini_->GetValue(section_, "account_token", nullptr);
+  account_token_ = account_token_value != nullptr ? account_token_value : "";
 
   if (persist_config_migration && CommitIni() < 0) {
     return -1;
@@ -382,6 +389,8 @@ int ConfigCenter::Save() {
 
   ini_->SetValue(section_, "file_transfer_save_path",
                 file_transfer_save_path_.c_str());
+  ini_->SetValue(section_, "account_username", account_username_.c_str());
+  ini_->SetValue(section_, "account_token", account_token_.c_str());
 
   SI_Error rc = CommitIni();
   if (rc < 0) {
@@ -942,5 +951,15 @@ int ConfigCenter::SetFileTransferSavePath(const std::string& path) {
 std::string ConfigCenter::GetFileTransferSavePath() const {
   std::lock_guard<std::mutex> lock(file_path_mutex_);
   return file_transfer_save_path_;
+}
+
+int ConfigCenter::SetAccountSession(const std::string& username,
+                                    const std::string& token) {
+  if (StoreValues({{"account_username", username},
+                   {"account_token", token}}) != 0)
+    return -1;
+  account_username_ = username;
+  account_token_ = token;
+  return 0;
 }
 }  // namespace crossdesk

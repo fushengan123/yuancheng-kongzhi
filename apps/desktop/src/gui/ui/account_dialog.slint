@@ -24,15 +24,14 @@ export component AccountDialog inherits Rectangle {
     callback logout();
     callback close();
 
-    width: parent.width; height: parent.height;
     background: #00000042;
     TouchArea { }
 
     card := FlatSurface {
-        x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
-        width: min(480px, parent.width - 24px);
-        height: min(560px, parent.height - 24px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: min(480px, root.width - 24px);
+        height: min(560px, root.height - 24px);
         background: white;
         border-radius: UiRadius.surface;
         outline-color: UiSurface.edge;
@@ -64,6 +63,7 @@ export component AccountDialog inherits Rectangle {
             password-input := RoundedLineEdit {
                 height: 32px;
                 placeholder-text: "至少 8 位";
+                input-type: InputType.password;
                 font-size: 12px;
             }
             HorizontalLayout {
